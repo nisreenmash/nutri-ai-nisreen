@@ -38,21 +38,18 @@
         .meal-card { border-inline-start: 5px solid var(--main); padding: 15px; background: white; margin-bottom: 10px; position: relative; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .regen-btn { position: absolute; inset-inline-end: 10px; top: 15px; background: #f0f0f0; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; color: #555; }
 
-        /* Checkboxes */
         .check-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 10px; }
         .check-label { font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
 
-        /* Workout Table */
         .wo-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .wo-table th { background: var(--dark); color: white; padding: 10px; border-radius: 8px 8px 0 0; }
         .wo-table td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: top; }
         .wo-row:nth-child(even) { background: #f9f9f9; }
 
-        /* Info Alert */
         .info-alert { background: #e3f2fd; border: 1px solid #2196f3; color: #0d47a1; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; }
-        .error-alert { background: #ffebee; border: 1px solid #e57373; color: #c62828; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: bold;}
+        .error-alert { background: #ffebee; border: 1px solid #e57373; color: #c62828; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; }
+        .warning-alert { background: #fff3e0; border: 1px solid #ffb74d; color: #e65100; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; font-size: 0.9rem; display: none; }
 
-        /* Chat */
         #chat-box { height: 50vh; overflow-y: auto; background: #f4f6f8; padding: 15px; border-radius: 20px; border: 1px solid #eee; margin-bottom: 10px; }
         .msg { padding: 10px 15px; border-radius: 15px; margin-bottom: 10px; max-width: 85%; }
         .ai { background: white; border: 1px solid #ddd; border-radius: 18px 18px 18px 0; }
@@ -151,18 +148,18 @@
     </div>
 
     <div id="pg-food" class="container">
+        
+        <div id="medical-warning" class="warning-alert"></div>
+
         <div class="id-card">
             <div style="text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:10px;" data-t="id_title">🆔 البطاقة الصحية</div>
             <div class="id-row"><span data-t="id_name">الاسم:</span> <span class="id-val" id="id-name">User</span></div>
             <div class="id-row"><span data-t="id_weight">الوزن:</span> <span class="id-val" id="id-weight">0 kg</span></div>
-            
             <div class="id-row"><span data-t="id_ideal">الوزن المثالي:</span> <span class="id-val" id="id-ideal">-- kg</span></div>
             <div class="id-row"><span data-t="id_diff">للوصول للمثالي:</span> <span class="id-val" id="id-diff">-- kg</span></div>
-            
             <div class="id-row"><span>BMI:</span> <span class="id-val" id="id-bmi">--</span></div>
             <div class="id-row"><span data-t="id_status">الحالة:</span> <span class="id-val" id="id-status">--</span></div>
             <div class="id-row"><span>BMR:</span> <span class="id-val" id="id-bmr">-- kcal</span></div>
-            
             <div class="id-row" style="border:none; margin-top:10px; justify-content:center; font-size:1.1rem; background:rgba(0,0,0,0.2); padding:10px; border-radius:10px;">
                 <span data-t="id_needs">الاحتياج:</span> <span id="id-cals" style="color:#f1c40f; margin-inline-start:5px;">0</span>
             </div>
@@ -233,6 +230,7 @@
         let currentLang = 'ar';
         let currentStatusAr = "--";
         let currentStatusEn = "--";
+        let baseTDEE = 0;
 
         const txt = {
             profile_title: { ar: "الملف الشخصي", en: "Personal Profile" },
@@ -331,7 +329,6 @@
         }
 
         let chatHistory = [{ role: "system", content: "Init" }];
-        let baseTDEE = 0;
 
         function nav(p, btn) {
             document.querySelectorAll('.container').forEach(c => c.classList.remove('active-page'));
@@ -345,7 +342,10 @@
             const h = document.getElementById('u-h').value;
             const a = document.getElementById('u-a').value;
             const errDiv = document.getElementById('setup-error');
+            const warnDiv = document.getElementById('medical-warning');
+            
             errDiv.style.display = "none";
+            warnDiv.style.display = "none";
             
             if(!w || !h || !a) {
                 const msg = currentLang==='ar' ? "الرجاء تعبئة جميع الحقول المطلوبة!" : "Please fill all required fields!";
@@ -363,19 +363,25 @@
                 bf: parseFloat(document.getElementById('u-bf').value) || 0,
                 activity: document.getElementById('u-activity').value,
                 goal: document.getElementById('u-goal').value,
-                diseases: dis // Sent to backend for validation (PCOS check)
+                diseases: dis 
             };
 
             try {
                 const res = await fetch('/api/calculate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
                 const data = await res.json();
                 
-                // --- 1. HANDLE VALIDATION ERRORS ---
-                if (data.error || data.stop) {
+                // --- HANDLE ERRORS ---
+                if (data.stop) {
                     errDiv.innerText = data.message;
                     errDiv.style.display = "block";
                     window.scrollTo(0,0);
                     return;
+                }
+
+                // --- HANDLE WARNINGS ---
+                if (data.warning_msg) {
+                    warnDiv.innerText = data.warning_msg;
+                    warnDiv.style.display = "block";
                 }
 
                 baseTDEE = data.cals;
@@ -383,14 +389,11 @@
                 currentStatusAr = data.status_ar || "--";
                 currentStatusEn = data.status_en || "--";
 
-                const localBMI = (body.weight / ((body.height/100)**2)).toFixed(1);
-                
                 document.getElementById('id-name').innerText = document.getElementById('u-name').value || "User";
                 document.getElementById('id-weight').innerText = body.weight + " kg";
-                document.getElementById('id-bmi').innerText = data.bmi || localBMI;
-                document.getElementById('id-bmr').innerText = (data.bmr || Math.round(data.cals / 1.5)) + " kcal";
+                document.getElementById('id-bmi').innerText = data.bmi;
+                document.getElementById('id-bmr').innerText = data.bmr + " kcal";
                 document.getElementById('id-cals').innerText = data.cals + " kcal";
-                
                 document.getElementById('id-status').innerText = currentLang === 'ar' ? currentStatusAr : currentStatusEn;
                 document.getElementById('id-ideal').innerText = data.perfectW + " kg";
                 document.getElementById('id-diff').innerText = data.diff + " kg";
@@ -429,9 +432,7 @@
             tbody.innerHTML = "";
             let schedule = [];
             const dNames = txt.days[currentLang];
-            
             const injuries = Array.from(document.querySelectorAll('.inj:checked')).map(c => c.value);
-
             const safeEx = (name, injType, sub) => injuries.includes(injType) ? sub : name;
 
             const fbA = [safeEx("Squat (3x10)", "knee", "Glute Bridges (3x15)"), safeEx("Bench Press (3x10)", "shoulder", "Floor Press (3x10)"), safeEx("Barbell Rows (3x10)", "back", "Chest Supported Row (3x12)")].join(", ");
@@ -444,29 +445,16 @@
             const push = [safeEx("Bench Press (3x8)", "shoulder", "Floor Press"), safeEx("Overhead Press (3x10)", "shoulder", "Lateral Raise"), safeEx("Dips (3x10)", "shoulder", "Tricep Pushdown")].join(", ");
             const pull = [safeEx("Deadlift (3x6)", "back", "Lat Pulldown"), safeEx("Barbell Row (3x10)", "back", "Chest Supported Row"), "Face Pulls (3x15)"].join(", ");
             const legs = [safeEx("Squat (3x8)", "knee", "Leg Press"), safeEx("Lunges (3x12)", "knee", "Hamstring Curl"), "Calf Raises (4x15)"].join(", ");
-
             const restTxt = txt.w_rest[currentLang];
             const walkTxt = txt.w_walk[currentLang];
 
-            if(freq == "0") {
-                schedule = dNames.map(d => ({d: d, f: restTxt, ex: walkTxt}));
-            } 
-            else if(freq == "3") {
-                schedule = [{d: dNames[0], f: "Full Body A", ex: fbA}, {d: dNames[1], f: restTxt, ex: walkTxt}, {d: dNames[2], f: "Full Body B", ex: fbB}, {d: dNames[3], f: restTxt, ex: walkTxt}, {d: dNames[4], f: "Full Body C", ex: fbC}, {d: dNames[5], f: "Cardio", ex: "30 min Run"}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
-            } 
-            else if(freq == "4") {
-                schedule = [{d: dNames[0], f: "Upper A", ex: upA}, {d: dNames[1], f: "Lower A", ex: lowA}, {d: dNames[2], f: restTxt, ex: walkTxt}, {d: dNames[3], f: "Upper B", ex: upB}, {d: dNames[4], f: "Lower B", ex: lowB}, {d: dNames[5], f: restTxt, ex: walkTxt}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
-            }
-            else if(freq == "5") {
-                schedule = [{d: dNames[0], f: "Push", ex: push}, {d: dNames[1], f: "Pull", ex: pull}, {d: dNames[2], f: "Legs", ex: legs}, {d: dNames[3], f: restTxt, ex: walkTxt}, {d: dNames[4], f: "Upper", ex: upA}, {d: dNames[5], f: "Lower", ex: lowA}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
-            }
-            else { 
-                schedule = [{d: dNames[0], f: "Push A", ex: push}, {d: dNames[1], f: "Pull A", ex: pull}, {d: dNames[2], f: "Legs A", ex: legs}, {d: dNames[3], f: "Push B", ex: push.replace("Bench", "Incline")}, {d: dNames[4], f: "Pull B", ex: pull.replace("Deadlift", "Pullups")}, {d: dNames[5], f: "Legs B", ex: legs.replace("Squat", "Front Squat")}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
-            }
+            if(freq == "0") schedule = dNames.map(d => ({d: d, f: restTxt, ex: walkTxt}));
+            else if(freq == "3") schedule = [{d: dNames[0], f: "Full Body A", ex: fbA}, {d: dNames[1], f: restTxt, ex: walkTxt}, {d: dNames[2], f: "Full Body B", ex: fbB}, {d: dNames[3], f: restTxt, ex: walkTxt}, {d: dNames[4], f: "Full Body C", ex: fbC}, {d: dNames[5], f: "Cardio", ex: "30 min Run"}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
+            else if(freq == "4") schedule = [{d: dNames[0], f: "Upper A", ex: upA}, {d: dNames[1], f: "Lower A", ex: lowA}, {d: dNames[2], f: restTxt, ex: walkTxt}, {d: dNames[3], f: "Upper B", ex: upB}, {d: dNames[4], f: "Lower B", ex: lowB}, {d: dNames[5], f: restTxt, ex: walkTxt}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
+            else if(freq == "5") schedule = [{d: dNames[0], f: "Push", ex: push}, {d: dNames[1], f: "Pull", ex: pull}, {d: dNames[2], f: "Legs", ex: legs}, {d: dNames[3], f: restTxt, ex: walkTxt}, {d: dNames[4], f: "Upper", ex: upA}, {d: dNames[5], f: "Lower", ex: lowA}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
+            else schedule = [{d: dNames[0], f: "Push A", ex: push}, {d: dNames[1], f: "Pull A", ex: pull}, {d: dNames[2], f: "Legs A", ex: legs}, {d: dNames[3], f: "Push B", ex: push.replace("Bench", "Incline")}, {d: dNames[4], f: "Pull B", ex: pull.replace("Deadlift", "Pullups")}, {d: dNames[5], f: "Legs B", ex: legs.replace("Squat", "Front Squat")}, {d: dNames[6], f: restTxt, ex: "Recovery"}];
 
-            schedule.forEach(s => {
-                tbody.innerHTML += `<tr class="wo-row"><td>${s.d}</td><td style="color:var(--main); font-weight:bold;">${s.f}</td><td style="font-size:0.85rem;">${s.ex}</td></tr>`;
-            });
+            schedule.forEach(s => tbody.innerHTML += `<tr class="wo-row"><td>${s.d}</td><td style="color:var(--main); font-weight:bold;">${s.f}</td><td style="font-size:0.85rem;">${s.ex}</td></tr>`);
         }
 
         async function render7DayPlan() {
@@ -476,8 +464,7 @@
             const algs = Array.from(document.querySelectorAll('.alg:checked')).map(c => c.value);
             const dis = Array.from(document.querySelectorAll('.med:checked')).map(c => c.value);
             
-            // --- CALCULATE MEAL TARGETS TO MATCH TDEE ---
-            // Distribution: Breakfast 25%, Lunch 35%, Dinner 30%, Snack 10%
+            // Calculate caloric targets per meal
             const targets = {
                 breakfast: Math.round(baseTDEE * 0.25),
                 lunch: Math.round(baseTDEE * 0.35),
@@ -491,12 +478,7 @@
                     const res = await fetch('/api/regen-meal', { 
                         method: 'POST', 
                         headers: {'Content-Type': 'application/json'}, 
-                        body: JSON.stringify({ 
-                            type, 
-                            allergies: algs, 
-                            diseases: dis,
-                            targetCalories: targets[type] // Pass strict target to backend
-                        }) 
+                        body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: targets[type] }) 
                     });
                     const meal = await res.json();
                     
@@ -541,14 +523,11 @@
             const inp = document.getElementById('chat-input');
             const box = document.getElementById('chat-box');
             const typing = document.getElementById('typing');
-            
             if(!inp.value) return;
-            
             box.innerHTML += `<div class="msg user">${inp.value}</div>`;
             chatHistory.push({ role: "user", content: inp.value });
             inp.value = "";
             box.scrollTop = box.scrollHeight;
-            
             typing.style.display = 'block';
 
             const res = await fetch('/api/chat', { 
@@ -557,7 +536,6 @@
                 body: JSON.stringify({ messages: chatHistory, lang: currentLang }) 
             });
             const data = await res.json();
-            
             typing.style.display = 'none';
             box.innerHTML += `<div class="msg ai">${data.reply}</div>`;
             chatHistory.push({ role: "assistant", content: data.reply });

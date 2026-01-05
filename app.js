@@ -14,7 +14,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 app.use(bodyParser.json());
-app.use(express.static(__dirname)); // Serves index.html
+app.use(express.static(__dirname)); 
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
@@ -150,12 +150,19 @@ app.post("/api/calculate", (req, res) => {
     const h = parseFloat(height);
     const a = parseFloat(age);
     const hasPCOS = (diseases || []).includes('pcos');
+    const hasDisease = diseases && diseases.length > 0;
 
     // --- SANITY CHECKS (Handle Typos) ---
     if (h > 240) return res.json({ stop: true, message: "Input Error: Height seems too high (> 240cm). Did you mean to type in mm?" });
     if (w > 300) return res.json({ stop: true, message: "Input Error: Weight seems extremely high (> 300kg). Please verify your entry." });
     if (h < 50) return res.json({ stop: true, message: "Input Error: Height is too low. Please check your units (cm)." });
     
+    // --- LOGICAL BODY FAT CHECK ---
+    if (bf) {
+        if (bf < 5) return res.json({ stop: true, message: "Input Error: Body Fat % is dangerously low (< 5%). Please recheck." });
+        if (bf > 60) return res.json({ stop: true, message: "Input Error: Body Fat % is suspiciously high (> 60%). Please recheck." });
+    }
+
     // --- MEDICAL & POLICY CHECKS ---
     
     // Rule: Men cannot have PCOS
@@ -163,29 +170,24 @@ app.post("/api/calculate", (req, res) => {
         return res.json({ stop: true, message: "Error: Biological males cannot be selected with PCOS. Please check your entries." });
     }
 
-    // Rule: Age Limit (Young)
-    if (a < 13) {
-        return res.json({ stop: true, message: "Sorry, you are too young for an automated strict diet plan. Focus on eating healthy whole foods and staying active!" });
-    }
+    // Rule: Age Limits
+    if (a < 13) return res.json({ stop: true, message: "Sorry, you are too young for an automated strict diet plan. Focus on eating healthy whole foods and staying active!" });
+    if (a > 80) return res.json({ stop: true, message: "At your age, strict dieting isn't recommended. Enjoy your life, eat what makes you feel good, and stay hydrated!" });
 
-    // Rule: Age Limit (Old)
-    if (a > 80) {
-        return res.json({ stop: true, message: "At your age, strict dieting isn't recommended. Enjoy your life, eat what makes you feel good, and stay hydrated!" });
-    }
+    // Rule: Short Stature
+    if (h < 130) return res.json({ stop: true, message: "Height input is quite low (< 130cm). Standard BMI calculations may not be accurate for you. Please consult a specialist." });
 
-    // Rule: Short Stature (Medical)
-    if (h < 130) {
-        return res.json({ stop: true, message: "Height input is quite low (< 130cm). Standard BMI calculations may not be accurate for you. Please consult a specialist." });
-    }
+    // Rule: Extreme Weights
+    if (w < 40) return res.json({ stop: true, message: "Your weight is quite low (<40kg). We recommend seeing a healthcare professional for a safe plan to gain strength." });
+    if (w > 130) return res.json({ stop: true, message: "Based on your weight (>130kg), we highly recommend consulting a healthcare professional for a personalized and safe medical weight management plan." });
 
-    // Rule: Underweight (Medical)
-    if (w < 40) {
-        return res.json({ stop: true, message: "Your weight is quite low (<40kg). We recommend seeing a healthcare professional for a safe plan to gain strength." });
-    }
+    // --- BMI LOGIC & RESTRICTIONS ---
+    const heightM = h / 100;
+    const bmi = (w / (heightM * heightM)).toFixed(1);
 
-    // Rule: High Weight (Medical Referral)
-    if (w > 130) {
-        return res.json({ stop: true, message: "Based on your weight (>130kg), we highly recommend consulting a healthcare professional for a personalized and safe medical weight management plan." });
+    // Rule: If BMI is Normal (18.5 - 24.9), BLOCK "Fat Loss"
+    if (bmi >= 18.5 && bmi < 25 && goal === 'cut') {
+        return res.json({ stop: true, message: `Your BMI is ${bmi} (Normal Range). We do not provide weight loss plans for healthy individuals. Please choose 'Maintenance' or 'Muscle Build'.` });
     }
 
     // --- CALCULATION LOGIC ---
@@ -198,22 +200,16 @@ app.post("/api/calculate", (req, res) => {
             : (10 * w) + (6.25 * h) - (5 * a) - 161;
     }
 
-    // Adjust BMR for PCOS
     if (hasPCOS) bmr *= 0.95;
 
     let tdee = bmr * parseFloat(activity);
     if (goal === 'cut') tdee -= 500;
     if (goal === 'bulk') tdee += 300;
 
-    // --- CALORIE FLOORS (Safety) ---
-    // Women: Floor at 1200
+    // --- CALORIE FLOORS ---
     if (gender !== 'male' && tdee < 1200) tdee = 1200;
-    // Men: Floor at 1500
     if (gender === 'male' && tdee < 1500) tdee = 1500;
 
-    const heightM = h / 100;
-    const bmi = (w / (heightM * heightM)).toFixed(1);
-    
     // Status Logic
     let status_en = "Normal";
     let status_ar = "وزن طبيعي";
@@ -221,7 +217,6 @@ app.post("/api/calculate", (req, res) => {
     else if (bmi >= 25 && bmi < 30) { status_en = "Overweight"; status_ar = "زيادة وزن"; }
     else if (bmi >= 30) { status_en = "Obese"; status_ar = "سمنة"; }
 
-    // Perfect Weight Calculation (BMI 22)
     const perfectW = (22 * (heightM * heightM)).toFixed(1);
     const diff = (w - perfectW).toFixed(1);
 
@@ -231,6 +226,12 @@ app.post("/api/calculate", (req, res) => {
         c: Math.round((tdee - (w * 2.0 * 4) - (tdee * 0.25)) / 4)
     };
 
+    // --- WARNING MESSAGE ---
+    let warning_msg = null;
+    if (hasDisease) {
+        warning_msg = "⚠️ Medical Notice: Since you selected a chronic condition, please consult your physician before starting this plan. The meals below are filtered for general safety, but specific medical advice is superior.";
+    }
+
     res.json({ 
         cals: Math.round(tdee), 
         macros, 
@@ -239,7 +240,8 @@ app.post("/api/calculate", (req, res) => {
         status_en,
         status_ar,
         perfectW,
-        diff
+        diff,
+        warning_msg
     });
 });
 
@@ -268,7 +270,7 @@ app.post("/api/regen-meal", (req, res) => {
     // Logic to select meal closest to target calories
     if (targetCalories) {
         safeOptions.sort((a, b) => Math.abs(a.cal - targetCalories) - Math.abs(b.cal - targetCalories));
-        res.json(safeOptions[0]); // Return the closest match
+        res.json(safeOptions[0]); 
     } else {
         res.json(safeOptions[Math.floor(Math.random() * safeOptions.length)]);
     }
