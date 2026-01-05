@@ -143,7 +143,7 @@ app.post("/api/chat", async (req, res) => {
 
 // --- 3. HEALTH CALCULATIONS ROUTE ---
 app.post("/api/calculate", (req, res) => {
-    const { weight, height, age, gender, bf, activity, goal, diseases } = req.body;
+    const { weight, height, age, gender, bf, activity, goal, diseases, injuries } = req.body;
     
     // --- DATA CONVERSION ---
     const w = parseFloat(weight);
@@ -151,43 +151,35 @@ app.post("/api/calculate", (req, res) => {
     const a = parseFloat(age);
     const hasPCOS = (diseases || []).includes('pcos');
     const hasDisease = diseases && diseases.length > 0;
+    const hasInjury = injuries && injuries.length > 0;
 
-    // --- SANITY CHECKS (Handle Typos) ---
-    if (h > 240) return res.json({ stop: true, message: "Input Error: Height seems too high (> 240cm). Did you mean to type in mm?" });
-    if (w > 300) return res.json({ stop: true, message: "Input Error: Weight seems extremely high (> 300kg). Please verify your entry." });
-    if (h < 50) return res.json({ stop: true, message: "Input Error: Height is too low. Please check your units (cm)." });
+    // --- SANITY CHECKS ---
+    if (h > 240) return res.json({ stop: true, message: "Input Error: Height seems too high (> 240cm)." });
+    if (w > 300) return res.json({ stop: true, message: "Input Error: Weight seems extremely high (> 300kg)." });
+    if (h < 50) return res.json({ stop: true, message: "Input Error: Height is too low." });
     
-    // --- LOGICAL BODY FAT CHECK ---
+    // --- BODY FAT CHECK ---
     if (bf) {
-        if (bf < 5) return res.json({ stop: true, message: "Input Error: Body Fat % is dangerously low (< 5%). Please recheck." });
-        if (bf > 60) return res.json({ stop: true, message: "Input Error: Body Fat % is suspiciously high (> 60%). Please recheck." });
+        if (bf < 5) return res.json({ stop: true, message: "Input Error: Body Fat % is dangerously low (< 5%)." });
+        if (bf > 60) return res.json({ stop: true, message: "Input Error: Body Fat % is suspiciously high (> 60%)." });
     }
 
     // --- MEDICAL & POLICY CHECKS ---
-    
-    // Rule: Men cannot have PCOS
     if (gender === 'male' && hasPCOS) {
-        return res.json({ stop: true, message: "Error: Biological males cannot be selected with PCOS. Please check your entries." });
+        return res.json({ stop: true, message: "Error: Biological males cannot be selected with PCOS." });
     }
+    if (a < 13) return res.json({ stop: true, message: "Sorry, you are too young for an automated plan." });
+    if (a > 80) return res.json({ stop: true, message: "At your age, strict dieting isn't recommended." });
+    if (h < 130) return res.json({ stop: true, message: "Height input is quite low (< 130cm). Consult a specialist." });
+    if (w < 40) return res.json({ stop: true, message: "Weight is quite low (<40kg). Consult a professional." });
+    if (w > 130) return res.json({ stop: true, message: "Based on your weight (>130kg), we highly recommend consulting a healthcare professional." });
 
-    // Rule: Age Limits
-    if (a < 13) return res.json({ stop: true, message: "Sorry, you are too young for an automated strict diet plan. Focus on eating healthy whole foods and staying active!" });
-    if (a > 80) return res.json({ stop: true, message: "At your age, strict dieting isn't recommended. Enjoy your life, eat what makes you feel good, and stay hydrated!" });
-
-    // Rule: Short Stature
-    if (h < 130) return res.json({ stop: true, message: "Height input is quite low (< 130cm). Standard BMI calculations may not be accurate for you. Please consult a specialist." });
-
-    // Rule: Extreme Weights
-    if (w < 40) return res.json({ stop: true, message: "Your weight is quite low (<40kg). We recommend seeing a healthcare professional for a safe plan to gain strength." });
-    if (w > 130) return res.json({ stop: true, message: "Based on your weight (>130kg), we highly recommend consulting a healthcare professional for a personalized and safe medical weight management plan." });
-
-    // --- BMI LOGIC & RESTRICTIONS ---
+    // --- BMI & RESTRICTIONS ---
     const heightM = h / 100;
     const bmi = (w / (heightM * heightM)).toFixed(1);
 
-    // Rule: If BMI is Normal (18.5 - 24.9), BLOCK "Fat Loss"
     if (bmi >= 18.5 && bmi < 25 && goal === 'cut') {
-        return res.json({ stop: true, message: `Your BMI is ${bmi} (Normal Range). We do not provide weight loss plans for healthy individuals. Please choose 'Maintenance' or 'Muscle Build'.` });
+        return res.json({ stop: true, message: `Your BMI is ${bmi} (Normal). We do not provide weight loss plans for healthy individuals.` });
     }
 
     // --- CALCULATION LOGIC ---
@@ -210,7 +202,7 @@ app.post("/api/calculate", (req, res) => {
     if (gender !== 'male' && tdee < 1200) tdee = 1200;
     if (gender === 'male' && tdee < 1500) tdee = 1500;
 
-    // Status Logic
+    // --- STATUS & RESULTS ---
     let status_en = "Normal";
     let status_ar = "وزن طبيعي";
     if (bmi < 18.5) { status_en = "Underweight"; status_ar = "نحافة"; }
@@ -226,10 +218,15 @@ app.post("/api/calculate", (req, res) => {
         c: Math.round((tdee - (w * 2.0 * 4) - (tdee * 0.25)) / 4)
     };
 
-    // --- WARNING MESSAGE ---
+    // --- WARNING MESSAGE GENERATOR ---
     let warning_msg = null;
-    if (hasDisease) {
-        warning_msg = "⚠️ Medical Notice: Since you selected a chronic condition, please consult your physician before starting this plan. The meals below are filtered for general safety, but specific medical advice is superior.";
+    let alerts = [];
+
+    if (hasDisease) alerts.push("Chronic Condition (Consult Physician)");
+    if (hasInjury) alerts.push("Workout Injury (Consult Coach/PT)");
+
+    if (alerts.length > 0) {
+        warning_msg = "⚠️ Medical Notice: " + alerts.join(" & ") + ". We have adjusted your plan for safety, but please consult a professional before starting.";
     }
 
     res.json({ 
@@ -253,7 +250,6 @@ app.post("/api/regen-meal", (req, res) => {
     const algs = Array.isArray(allergies) ? allergies : [];
     const dis = Array.isArray(diseases) ? diseases : [];
 
-    // Filter meals
     let safeOptions = options.filter(meal => {
         const mTags = meal.tags || [];
         if (algs.includes('nuts') && mTags.includes('nuts')) return false;
@@ -267,7 +263,6 @@ app.post("/api/regen-meal", (req, res) => {
         safeOptions = [{ name_ar: "خيار وجزر", desc_ar: "خضار مقطعة (آمن)", name_en: "Veggie Sticks", desc_en: "Safe snack", cal: 50 }]; 
     }
 
-    // Logic to select meal closest to target calories
     if (targetCalories) {
         safeOptions.sort((a, b) => Math.abs(a.cal - targetCalories) - Math.abs(b.cal - targetCalories));
         res.json(safeOptions[0]); 

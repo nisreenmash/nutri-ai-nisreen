@@ -354,6 +354,7 @@
             }
 
             const dis = Array.from(document.querySelectorAll('.med:checked')).map(c => c.value);
+            const inj = Array.from(document.querySelectorAll('.inj:checked')).map(c => c.value);
 
             const body = {
                 weight: parseFloat(w),
@@ -363,7 +364,8 @@
                 bf: parseFloat(document.getElementById('u-bf').value) || 0,
                 activity: document.getElementById('u-activity').value,
                 goal: document.getElementById('u-goal').value,
-                diseases: dis 
+                diseases: dis,
+                injuries: inj
             };
 
             try {
