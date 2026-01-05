@@ -2,17 +2,23 @@ import express from "express";
 import OpenAI from "openai";
 import dotenv from "dotenv";
 import bodyParser from "body-parser";
+import path from "path";
+import { fileURLToPath } from "url";
 
 dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
+// Setup for serving static files in ES Module
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 app.use(bodyParser.json());
-app.use(express.static('.'));
+app.use(express.static(__dirname)); // Serves index.html
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// 1. MASSIVE MEAL DATABASE (25+ Options with Specific Portions)
+// --- 1. MEAL DATABASE ---
 const mealDB = {
     "middle eastern": {
         breakfast: [
@@ -111,7 +117,7 @@ const mealDB = {
     }
 };
 
-// 2. CHATBOT (Bilingual)
+// --- 2. CHATBOT (Bilingual) ---
 app.post("/api/chat", async (req, res) => {
     try {
         const { messages, lang } = req.body;
@@ -135,16 +141,23 @@ app.post("/api/chat", async (req, res) => {
     }
 });
 
-// 3. HEALTH CALCULATIONS (Auto Ideal Weight)
+// --- 3. HEALTH CALCULATIONS ROUTE ---
 app.post("/api/calculate", (req, res) => {
     const { weight, height, age, gender, bf, activity, goal, diseases } = req.body;
     
-    // --- VALIDATION LAYER ---
+    // --- DATA CONVERSION ---
     const w = parseFloat(weight);
     const h = parseFloat(height);
     const a = parseFloat(age);
     const hasPCOS = (diseases || []).includes('pcos');
 
+    // --- SANITY CHECKS (Handle Typos) ---
+    if (h > 240) return res.json({ stop: true, message: "Input Error: Height seems too high (> 240cm). Did you mean to type in mm?" });
+    if (w > 300) return res.json({ stop: true, message: "Input Error: Weight seems extremely high (> 300kg). Please verify your entry." });
+    if (h < 50) return res.json({ stop: true, message: "Input Error: Height is too low. Please check your units (cm)." });
+    
+    // --- MEDICAL & POLICY CHECKS ---
+    
     // Rule: Men cannot have PCOS
     if (gender === 'male' && hasPCOS) {
         return res.json({ stop: true, message: "Error: Biological males cannot be selected with PCOS. Please check your entries." });
@@ -160,17 +173,17 @@ app.post("/api/calculate", (req, res) => {
         return res.json({ stop: true, message: "At your age, strict dieting isn't recommended. Enjoy your life, eat what makes you feel good, and stay hydrated!" });
     }
 
-    // Rule: Height Check
+    // Rule: Short Stature (Medical)
     if (h < 130) {
-        return res.json({ stop: true, message: "Height input seems invalid (less than 130cm). Please recheck your measurements." });
+        return res.json({ stop: true, message: "Height input is quite low (< 130cm). Standard BMI calculations may not be accurate for you. Please consult a specialist." });
     }
 
-    // Rule: Weight Check (Low)
+    // Rule: Underweight (Medical)
     if (w < 40) {
         return res.json({ stop: true, message: "Your weight is quite low (<40kg). We recommend seeing a healthcare professional for a safe plan to gain strength." });
     }
 
-    // Rule: Weight Check (High)
+    // Rule: High Weight (Medical Referral)
     if (w > 130) {
         return res.json({ stop: true, message: "Based on your weight (>130kg), we highly recommend consulting a healthcare professional for a personalized and safe medical weight management plan." });
     }
@@ -210,8 +223,6 @@ app.post("/api/calculate", (req, res) => {
 
     // Perfect Weight Calculation (BMI 22)
     const perfectW = (22 * (heightM * heightM)).toFixed(1);
-    
-    // Difference (To Ideal)
     const diff = (w - perfectW).toFixed(1);
 
     const macros = {
@@ -232,7 +243,7 @@ app.post("/api/calculate", (req, res) => {
     });
 });
 
-// 4. MEAL REGENERATOR (Strict Filters + Calorie Matching)
+// --- 4. MEAL REGENERATOR ROUTE ---
 app.post("/api/regen-meal", (req, res) => {
     const { type, allergies, diseases, targetCalories } = req.body; 
     const options = mealDB["middle eastern"][type] || mealDB["middle eastern"]["lunch"];
@@ -240,32 +251,25 @@ app.post("/api/regen-meal", (req, res) => {
     const algs = Array.isArray(allergies) ? allergies : [];
     const dis = Array.isArray(diseases) ? diseases : [];
 
+    // Filter meals
     let safeOptions = options.filter(meal => {
         const mTags = meal.tags || [];
-        
-        // Strict Checks
         if (algs.includes('nuts') && mTags.includes('nuts')) return false;
         if (algs.includes('gluten') && mTags.includes('gluten')) return false;
         if (algs.includes('lactose') && mTags.includes('lactose')) return false;
-        
-        // Disease Checks
         if (dis.includes('diabetes') && mTags.includes('sugar')) return false;
-
         return true;
     });
 
     if (safeOptions.length === 0) {
-        // Fallback: Return a very safe default if everything is filtered
         safeOptions = [{ name_ar: "خيار وجزر", desc_ar: "خضار مقطعة (آمن)", name_en: "Veggie Sticks", desc_en: "Safe snack", cal: 50 }]; 
     }
 
     // Logic to select meal closest to target calories
     if (targetCalories) {
         safeOptions.sort((a, b) => Math.abs(a.cal - targetCalories) - Math.abs(b.cal - targetCalories));
-        // Pick the closest one
-        res.json(safeOptions[0]);
+        res.json(safeOptions[0]); // Return the closest match
     } else {
-        // Fallback to random if no target provided
         res.json(safeOptions[Math.floor(Math.random() * safeOptions.length)]);
     }
 });
