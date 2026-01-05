@@ -134,6 +134,7 @@
                 <option value="1.375" data-t="act_2">خفيف</option>
                 <option value="1.55" data-t="act_3">متوسط</option>
                 <option value="1.725" data-t="act_4">عالي</option>
+                <option value="1.9" data-t="act_5">نشيط جداً (Extra Active)</option>
             </select>
 
             <label data-t="goal_label">الهدف</label>
@@ -260,6 +261,7 @@
             act_2: { ar: "خفيف", en: "Light" },
             act_3: { ar: "متوسط", en: "Moderate" },
             act_4: { ar: "عالي", en: "High" },
+            act_5: { ar: "نشيط جداً (Extra)", en: "Extra Active" },
             goal_label: { ar: "الهدف", en: "Goal" },
             goal_cut: { ar: "خسارة دهون", en: "Fat Loss" },
             goal_maint: { ar: "محافظة", en: "Maintenance" },
@@ -323,6 +325,9 @@
             }
 
             if(document.getElementById('meals-list').innerHTML !== "") {
+                // Re-render only if plan exists
+                // Note: We avoid full re-render here to keep state, 
+                // but for language toggle it's necessary.
                 render7DayPlan();
                 renderDynamicWorkout();
             }
@@ -372,7 +377,6 @@
                 const res = await fetch('/api/calculate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
                 const data = await res.json();
                 
-                // --- HANDLE ERRORS ---
                 if (data.stop) {
                     errDiv.innerText = data.message;
                     errDiv.style.display = "block";
@@ -380,14 +384,12 @@
                     return;
                 }
 
-                // --- HANDLE WARNINGS ---
                 if (data.warning_msg) {
                     warnDiv.innerText = data.warning_msg;
                     warnDiv.style.display = "block";
                 }
 
                 baseTDEE = data.cals;
-
                 currentStatusAr = data.status_ar || "--";
                 currentStatusEn = data.status_en || "--";
 
@@ -400,12 +402,12 @@
                 document.getElementById('id-ideal').innerText = data.perfectW + " kg";
                 document.getElementById('id-diff').innerText = data.diff + " kg";
 
-                render7DayPlan();
+                await render7DayPlan(); // Await ensures full render
                 renderDynamicWorkout();
                 nav('pg-food', document.querySelectorAll('.nav-item')[1]);
             } catch(e) {
                 console.error(e);
-                alert("Server Error. Please try again.");
+                alert("Server Error. Check console.");
             }
         }
 
@@ -459,14 +461,15 @@
             schedule.forEach(s => tbody.innerHTML += `<tr class="wo-row"><td>${s.d}</td><td style="color:var(--main); font-weight:bold;">${s.f}</td><td style="font-size:0.85rem;">${s.ex}</td></tr>`);
         }
 
+        // --- UPDATED: REGENERATE LOGIC ---
         async function render7DayPlan() {
             const list = document.getElementById('meals-list');
-            list.innerHTML = "";
+            list.innerHTML = "<div style='text-align:center; padding:20px;'>Loading plan...</div>";
+            
             const dNames = txt.days[currentLang];
             const algs = Array.from(document.querySelectorAll('.alg:checked')).map(c => c.value);
             const dis = Array.from(document.querySelectorAll('.med:checked')).map(c => c.value);
             
-            // Calculate caloric targets per meal
             const targets = {
                 breakfast: Math.round(baseTDEE * 0.25),
                 lunch: Math.round(baseTDEE * 0.35),
@@ -474,51 +477,80 @@
                 snacks: Math.round(baseTDEE * 0.10)
             };
 
-            for (let day of dNames) {
-                let html = `<div class="day-section"><div class="day-title">${day}</div>`;
-                for (let type of ['breakfast', 'lunch', 'dinner', 'snacks']) {
-                    const res = await fetch('/api/regen-meal', { 
-                        method: 'POST', 
-                        headers: {'Content-Type': 'application/json'}, 
-                        body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: targets[type] }) 
-                    });
-                    const meal = await res.json();
-                    
-                    const tKey = type==='breakfast'?'m_break':type==='lunch'?'m_lunch':type==='dinner'?'m_dinner':'m_snack';
-                    const title = txt[tKey][currentLang];
-                    const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
-                    const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
+            let fullHtml = ""; // Build string first, update DOM once
 
-                    html += `<div class="meal-card">
-                        <div style="font-weight:bold; color:var(--main); font-size:0.9rem;">${title}</div>
-                        <div style="font-weight:900;">${name}</div>
-                        <div style="font-size:0.9rem; color:#666;">${desc} | ${meal.cal} cal</div>
-                        <button class="regen-btn" onclick="regenOne(this, '${type}', ${targets[type]})"><i class="fas fa-sync-alt"></i></button>
-                    </div>`;
+            for (let day of dNames) {
+                fullHtml += `<div class="day-section"><div class="day-title">${day}</div>`;
+                
+                for (let type of ['breakfast', 'lunch', 'dinner', 'snacks']) {
+                    try {
+                        const res = await fetch('/api/regen-meal', { 
+                            method: 'POST', 
+                            headers: {'Content-Type': 'application/json'}, 
+                            body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: targets[type] }) 
+                        });
+                        const meal = await res.json();
+                        
+                        const tKey = type==='breakfast'?'m_break':type==='lunch'?'m_lunch':type==='dinner'?'m_dinner':'m_snack';
+                        const title = txt[tKey][currentLang];
+                        const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
+                        const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
+
+                        // Added classes 'meal-name' and 'meal-desc' for safe targeting
+                        fullHtml += `<div class="meal-card">
+                            <div style="font-weight:bold; color:var(--main); font-size:0.9rem;">${title}</div>
+                            <div class="meal-name" style="font-weight:900;">${name}</div>
+                            <div class="meal-desc" style="font-size:0.9rem; color:#666;">${desc} | ${meal.cal} cal</div>
+                            <button class="regen-btn" onclick="regenOne(this, '${type}', ${targets[type]})"><i class="fas fa-sync-alt"></i></button>
+                        </div>`;
+                    } catch(e) {
+                        console.error("Error fetching initial meal:", e);
+                    }
                 }
-                list.innerHTML += html + `</div>`;
+                fullHtml += `</div>`;
             }
+            list.innerHTML = fullHtml; // Single update prevents flickering
         }
 
         async function regenOne(btn, type, target) {
-            btn.innerHTML = "...";
-            const algs = Array.from(document.querySelectorAll('.alg:checked')).map(c => c.value);
-            const dis = Array.from(document.querySelectorAll('.med:checked')).map(c => c.value);
-            
-            const res = await fetch('/api/regen-meal', { 
-                method: 'POST', 
-                headers: {'Content-Type': 'application/json'}, 
-                body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: target }) 
-            });
-            const meal = await res.json();
-            const card = btn.parentElement;
-            
-            const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
-            const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
+            const originalIcon = btn.innerHTML;
+            btn.innerHTML = "..."; 
+            btn.disabled = true; // Prevent double clicks
 
-            card.querySelector('div:nth-child(2)').innerText = name;
-            card.querySelector('div:nth-child(3)').innerText = `${desc} | ${meal.cal} cal`;
-            btn.innerHTML = `<i class="fas fa-sync-alt"></i>`;
+            try {
+                const algs = Array.from(document.querySelectorAll('.alg:checked')).map(c => c.value);
+                const dis = Array.from(document.querySelectorAll('.med:checked')).map(c => c.value);
+                
+                const res = await fetch('/api/regen-meal', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: target || 400 }) // Fallback target
+                });
+                
+                if (!res.ok) throw new Error("Network response was not ok");
+                
+                const meal = await res.json();
+                const card = btn.parentElement;
+                
+                const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
+                const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
+
+                // Targeted update using the new classes
+                const nameDiv = card.querySelector('.meal-name');
+                const descDiv = card.querySelector('.meal-desc');
+
+                if (nameDiv) nameDiv.innerText = name;
+                if (descDiv) descDiv.innerText = `${desc} | ${meal.cal} cal`;
+
+                btn.innerHTML = `<i class="fas fa-sync-alt"></i>`;
+            } catch (err) {
+                console.error(err);
+                btn.style.backgroundColor = "#e74c3c"; // Turn red on error
+                btn.innerHTML = "!";
+                alert("Error regenerating meal. Please try again.");
+            } finally {
+                btn.disabled = false;
+            }
         }
 
         async function sendMsg() {

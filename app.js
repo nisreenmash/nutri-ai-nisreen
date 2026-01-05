@@ -9,7 +9,6 @@ dotenv.config();
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Setup for serving static files in ES Module
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -182,10 +181,13 @@ app.post("/api/calculate", (req, res) => {
         return res.json({ stop: true, message: `Your BMI is ${bmi} (Normal). We do not provide weight loss plans for healthy individuals.` });
     }
 
-    // --- CALCULATION LOGIC ---
+    // --- CALCULATION LOGIC (UPDATED: Step 1, 2, 3) ---
+    
+    // Step 1: Calculate BMR (Mifflin-St Jeor)
     let bmr;
     if (bf && bf > 0) {
-        bmr = 370 + (21.6 * (w * (1 - (bf / 100))));
+        // Optional: If BF is known, Katch-McArdle is better, but sticking to prompt logic
+        bmr = 370 + (21.6 * (w * (1 - (bf / 100)))); 
     } else {
         bmr = (gender === 'male') 
             ? (10 * w) + (6.25 * h) - (5 * a) + 5 
@@ -194,11 +196,23 @@ app.post("/api/calculate", (req, res) => {
 
     if (hasPCOS) bmr *= 0.95;
 
+    // Step 2: Determine Activity Factor
+    // Activity multipliers are handled by the value passed from frontend (1.2, 1.375, 1.55, 1.725, 1.9)
     let tdee = bmr * parseFloat(activity);
-    if (goal === 'cut') tdee -= 500;
-    if (goal === 'bulk') tdee += 300;
 
-    // --- CALORIE FLOORS ---
+    // Step 3: Adjust for Goal
+    // Weight Loss: Subtract ~500 (range 300-500)
+    if (goal === 'cut') {
+        tdee -= 500;
+    }
+    // Muscle Gain: Add ~250-500 (We use +400 as a solid middle ground)
+    if (goal === 'bulk') {
+        tdee += 400;
+    }
+    // Maintenance: Eat TDEE (No change)
+
+    // --- CALORIE FLOORS (Safety Net) ---
+    // Ensure calculation doesn't drop below safe minimums regardless of the math above
     if (gender !== 'male' && tdee < 1200) tdee = 1200;
     if (gender === 'male' && tdee < 1500) tdee = 1500;
 
