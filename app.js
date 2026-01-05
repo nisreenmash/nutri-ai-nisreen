@@ -17,7 +17,7 @@ app.use(express.static(__dirname));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- 1. MEAL DATABASE ---
+// --- 1. MEAL DATABASE (SAME AS BEFORE) ---
 const mealDB = {
     "middle eastern": {
         breakfast: [
@@ -116,7 +116,7 @@ const mealDB = {
     }
 };
 
-// --- 2. CHATBOT (Bilingual) ---
+// --- 2. CHATBOT ---
 app.post("/api/chat", async (req, res) => {
     try {
         const { messages, lang } = req.body;
@@ -140,11 +140,11 @@ app.post("/api/chat", async (req, res) => {
     }
 });
 
-// --- 3. HEALTH CALCULATIONS ROUTE ---
+// --- 3. HEALTH CALCULATIONS ---
 app.post("/api/calculate", (req, res) => {
     const { weight, height, age, gender, bf, activity, goal, diseases, injuries } = req.body;
     
-    // --- DATA CONVERSION ---
+    // ... (Keep existing validation & Math logic) ...
     const w = parseFloat(weight);
     const h = parseFloat(height);
     const a = parseFloat(age);
@@ -152,28 +152,24 @@ app.post("/api/calculate", (req, res) => {
     const hasDisease = diseases && diseases.length > 0;
     const hasInjury = injuries && injuries.length > 0;
 
-    // --- SANITY CHECKS ---
     if (h > 240) return res.json({ stop: true, message: "Input Error: Height seems too high (> 240cm)." });
     if (w > 300) return res.json({ stop: true, message: "Input Error: Weight seems extremely high (> 300kg)." });
     if (h < 50) return res.json({ stop: true, message: "Input Error: Height is too low." });
     
-    // --- BODY FAT CHECK ---
     if (bf) {
         if (bf < 5) return res.json({ stop: true, message: "Input Error: Body Fat % is dangerously low (< 5%)." });
         if (bf > 60) return res.json({ stop: true, message: "Input Error: Body Fat % is suspiciously high (> 60%)." });
     }
 
-    // --- MEDICAL & POLICY CHECKS ---
     if (gender === 'male' && hasPCOS) {
         return res.json({ stop: true, message: "Error: Biological males cannot be selected with PCOS." });
     }
     if (a < 13) return res.json({ stop: true, message: "Sorry, you are too young for an automated plan." });
     if (a > 80) return res.json({ stop: true, message: "At your age, strict dieting isn't recommended." });
-    if (h < 130) return res.json({ stop: true, message: "Height input is quite low (< 130cm). Consult a specialist." });
-    if (w < 40) return res.json({ stop: true, message: "Weight is quite low (<40kg). Consult a professional." });
+    if (h < 130) return res.json({ stop: true, message: "Height input is quite low (< 130cm)." });
+    if (w < 40) return res.json({ stop: true, message: "Weight is quite low (<40kg)." });
     if (w > 130) return res.json({ stop: true, message: "Based on your weight (>130kg), we highly recommend consulting a healthcare professional." });
 
-    // --- BMI & RESTRICTIONS ---
     const heightM = h / 100;
     const bmi = (w / (heightM * heightM)).toFixed(1);
 
@@ -181,12 +177,8 @@ app.post("/api/calculate", (req, res) => {
         return res.json({ stop: true, message: `Your BMI is ${bmi} (Normal). We do not provide weight loss plans for healthy individuals.` });
     }
 
-    // --- CALCULATION LOGIC (UPDATED: Step 1, 2, 3) ---
-    
-    // Step 1: Calculate BMR (Mifflin-St Jeor)
     let bmr;
     if (bf && bf > 0) {
-        // Optional: If BF is known, Katch-McArdle is better, but sticking to prompt logic
         bmr = 370 + (21.6 * (w * (1 - (bf / 100)))); 
     } else {
         bmr = (gender === 'male') 
@@ -196,27 +188,13 @@ app.post("/api/calculate", (req, res) => {
 
     if (hasPCOS) bmr *= 0.95;
 
-    // Step 2: Determine Activity Factor
-    // Activity multipliers are handled by the value passed from frontend (1.2, 1.375, 1.55, 1.725, 1.9)
     let tdee = bmr * parseFloat(activity);
+    if (goal === 'cut') tdee -= 500;
+    if (goal === 'bulk') tdee += 400;
 
-    // Step 3: Adjust for Goal
-    // Weight Loss: Subtract ~500 (range 300-500)
-    if (goal === 'cut') {
-        tdee -= 500;
-    }
-    // Muscle Gain: Add ~250-500 (We use +400 as a solid middle ground)
-    if (goal === 'bulk') {
-        tdee += 400;
-    }
-    // Maintenance: Eat TDEE (No change)
-
-    // --- CALORIE FLOORS (Safety Net) ---
-    // Ensure calculation doesn't drop below safe minimums regardless of the math above
     if (gender !== 'male' && tdee < 1200) tdee = 1200;
     if (gender === 'male' && tdee < 1500) tdee = 1500;
 
-    // --- STATUS & RESULTS ---
     let status_en = "Normal";
     let status_ar = "وزن طبيعي";
     if (bmi < 18.5) { status_en = "Underweight"; status_ar = "نحافة"; }
@@ -232,13 +210,10 @@ app.post("/api/calculate", (req, res) => {
         c: Math.round((tdee - (w * 2.0 * 4) - (tdee * 0.25)) / 4)
     };
 
-    // --- WARNING MESSAGE GENERATOR ---
     let warning_msg = null;
     let alerts = [];
-
     if (hasDisease) alerts.push("Chronic Condition (Consult Physician)");
     if (hasInjury) alerts.push("Workout Injury (Consult Coach/PT)");
-
     if (alerts.length > 0) {
         warning_msg = "⚠️ Medical Notice: " + alerts.join(" & ") + ". We have adjusted your plan for safety, but please consult a professional before starting.";
     }
@@ -256,15 +231,14 @@ app.post("/api/calculate", (req, res) => {
     });
 });
 
-// --- 4. MEAL REGENERATOR ROUTE ---
-app.post("/api/regen-meal", (req, res) => {
-    const { type, allergies, diseases, targetCalories } = req.body; 
-    const options = mealDB["middle eastern"][type] || mealDB["middle eastern"]["lunch"];
-    
+// --- HELPER FOR VARIETY ---
+// Filters by tags and picks random WITHOUT repeats if possible
+function getMeals(category, count, allergies, diseases, targetCal) {
     const algs = Array.isArray(allergies) ? allergies : [];
     const dis = Array.isArray(diseases) ? diseases : [];
-
-    let safeOptions = options.filter(meal => {
+    
+    // 1. Filter
+    let validMeals = mealDB["middle eastern"][category].filter(meal => {
         const mTags = meal.tags || [];
         if (algs.includes('nuts') && mTags.includes('nuts')) return false;
         if (algs.includes('gluten') && mTags.includes('gluten')) return false;
@@ -273,16 +247,65 @@ app.post("/api/regen-meal", (req, res) => {
         return true;
     });
 
-    if (safeOptions.length === 0) {
-        safeOptions = [{ name_ar: "خيار وجزر", desc_ar: "خضار مقطعة (آمن)", name_en: "Veggie Sticks", desc_en: "Safe snack", cal: 50 }]; 
+    if(validMeals.length === 0) return []; // Should handle fallback in caller
+
+    // 2. Sort by Calories (closest to target)
+    if(targetCal) {
+        validMeals.sort((a, b) => Math.abs(a.cal - targetCal) - Math.abs(b.cal - targetCal));
+        // Take top 50% matches so we still have variety, not just the single best one 7 times
+        const topSlice = Math.max(1, Math.floor(validMeals.length * 0.6));
+        validMeals = validMeals.slice(0, topSlice);
     }
 
-    if (targetCalories) {
-        safeOptions.sort((a, b) => Math.abs(a.cal - targetCalories) - Math.abs(b.cal - targetCalories));
-        res.json(safeOptions[0]); 
-    } else {
-        res.json(safeOptions[Math.floor(Math.random() * safeOptions.length)]);
+    // 3. Shuffle
+    for (let i = validMeals.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [validMeals[i], validMeals[j]] = [validMeals[j], validMeals[i]];
     }
+
+    // 4. Select Unique
+    let selected = [];
+    for(let i=0; i<count; i++) {
+        // If we run out of unique meals, loop back to start
+        selected.push(validMeals[i % validMeals.length]);
+    }
+    return selected;
+}
+
+// --- 4. NEW: GENERATE WEEKLY PLAN (Instant & Varied) ---
+app.post("/api/generate-week", (req, res) => {
+    const { allergies, diseases, targets } = req.body;
+    
+    // We need 7 meals for each category
+    const breakfasts = getMeals('breakfast', 7, allergies, diseases, targets.breakfast);
+    const lunches = getMeals('lunch', 7, allergies, diseases, targets.lunch);
+    const dinners = getMeals('dinner', 7, allergies, diseases, targets.dinner);
+    const snacks = getMeals('snacks', 7, allergies, diseases, targets.snacks);
+
+    // Structure for frontend
+    // We'll return an object where keys are 0-6 (Days)
+    let weekPlan = {};
+    const dayNames = ["Sat", "Sun", "Mon", "Tue", "Wed", "Thu", "Fri"]; // Just for indexing reference
+
+    for(let i=0; i<7; i++) {
+        weekPlan[i] = {
+            breakfast: breakfasts[i] || { name_en: "Safe Option", name_ar: "خيار آمن", cal: 300 },
+            lunch: lunches[i] || { name_en: "Grilled Chicken", name_ar: "دجاج مشوي", cal: 400 },
+            dinner: dinners[i] || { name_en: "Salad", name_ar: "سلطة", cal: 200 },
+            snacks: snacks[i] || { name_en: "Fruit", name_ar: "فاكهة", cal: 100 }
+        };
+    }
+
+    res.json(weekPlan);
+});
+
+// --- 5. REGENERATE SINGLE MEAL (Existing) ---
+// Kept for the button click
+app.post("/api/regen-meal", (req, res) => {
+    const { type, allergies, diseases, targetCalories } = req.body; 
+    const selection = getMeals(type === 'snacks' ? 'snacks' : type, 3, allergies, diseases, targetCalories);
+    // Pick one random from the top 3 best matches
+    res.json(selection[Math.floor(Math.random() * selection.length)]);
 });
 
 app.listen(PORT, () => console.log(`Nutri-AI active on port ${PORT}`));

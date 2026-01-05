@@ -27,16 +27,15 @@
         .btn-main { width: 100%; background: var(--main); color: white; padding: 16px; border-radius: 14px; border: none; font-weight: 700; cursor: pointer; margin-top: 15px; transition: 0.2s; }
         .btn-main:active { transform: scale(0.98); }
 
-        /* ID Card */
         .id-card { background: linear-gradient(135deg, #2c3e50, #4ca1af); color: white; border-radius: 15px; padding: 20px; margin-bottom: 15px; }
         .id-row { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
         .id-val { font-weight: bold; }
 
-        /* Meal Cards */
         .day-section { margin-top: 30px; border-top: 2px dashed #eee; padding-top: 20px; }
         .day-title { text-align: center; font-weight: 900; background: #e8f5e9; padding: 8px; border-radius: 8px; color: var(--dark); margin-bottom: 10px; }
         .meal-card { border-inline-start: 5px solid var(--main); padding: 15px; background: white; margin-bottom: 10px; position: relative; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-        .regen-btn { position: absolute; inset-inline-end: 10px; top: 15px; background: #f0f0f0; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; color: #555; }
+        .regen-btn { position: absolute; inset-inline-end: 10px; top: 15px; background: #f0f0f0; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; color: #555; transition: 0.3s; }
+        .regen-btn:hover { background: #e0e0e0; }
 
         .check-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 10px; }
         .check-label { font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
@@ -59,6 +58,9 @@
         .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; border-top: 1px solid #eee; display: flex; justify-content: space-around; padding: 15px 0; z-index: 999; }
         .nav-item { font-size: 1.5rem; color: #ccc; cursor: pointer; }
         .active-nav { color: var(--main); transform: translateY(-5px); }
+
+        .fa-spin { animation: fa-spin 1s infinite linear; }
+        @keyframes fa-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
 
         @media print {
             .nav-bar, .header, #pg-setup, #pg-chat, #pg-gym, .regen-btn, .btn-main { display: none !important; }
@@ -134,7 +136,7 @@
                 <option value="1.375" data-t="act_2">خفيف</option>
                 <option value="1.55" data-t="act_3">متوسط</option>
                 <option value="1.725" data-t="act_4">عالي</option>
-                <option value="1.9" data-t="act_5">نشيط جداً (Extra Active)</option>
+                <option value="1.9" data-t="act_5">نشيط جداً (Extra)</option>
             </select>
 
             <label data-t="goal_label">الهدف</label>
@@ -325,11 +327,9 @@
             }
 
             if(document.getElementById('meals-list').innerHTML !== "") {
-                // Re-render only if plan exists
-                // Note: We avoid full re-render here to keep state, 
-                // but for language toggle it's necessary.
-                render7DayPlan();
-                renderDynamicWorkout();
+                // To maintain state but update lang, re-render from saved data ideally
+                // For simplicity in this structure, we just re-fetch instant logic
+                generatePlan(); 
             }
         }
 
@@ -374,6 +374,7 @@
             };
 
             try {
+                // 1. Get Health Stats
                 const res = await fetch('/api/calculate', { method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body) });
                 const data = await res.json();
                 
@@ -402,8 +403,12 @@
                 document.getElementById('id-ideal').innerText = data.perfectW + " kg";
                 document.getElementById('id-diff').innerText = data.diff + " kg";
 
-                await render7DayPlan(); // Await ensures full render
+                // 2. Fetch Weekly Plan (INSTANT)
+                await render7DayPlan(); 
+                
+                // 3. Render Workout
                 renderDynamicWorkout();
+                
                 nav('pg-food', document.querySelectorAll('.nav-item')[1]);
             } catch(e) {
                 console.error(e);
@@ -424,7 +429,7 @@
             const newW = document.getElementById('new-weight').value;
             if(newW) {
                 document.getElementById('u-w').value = newW;
-                generatePlan();
+                generatePlan(); // Re-runs full logic
                 const msg = currentLang==='ar' ? "تم التحديث!" : "Updated!";
                 alert(msg);
             }
@@ -461,10 +466,10 @@
             schedule.forEach(s => tbody.innerHTML += `<tr class="wo-row"><td>${s.d}</td><td style="color:var(--main); font-weight:bold;">${s.f}</td><td style="font-size:0.85rem;">${s.ex}</td></tr>`);
         }
 
-        // --- UPDATED: REGENERATE LOGIC ---
+        // --- NEW: ONE CALL FOR WHOLE WEEK (Instant) ---
         async function render7DayPlan() {
             const list = document.getElementById('meals-list');
-            list.innerHTML = "<div style='text-align:center; padding:20px;'>Loading plan...</div>";
+            list.innerHTML = "<div style='text-align:center; padding:20px;'><i class='fas fa-spinner fa-spin'></i> جارٍ إعداد الخطة...</div>";
             
             const dNames = txt.days[currentLang];
             const algs = Array.from(document.querySelectorAll('.alg:checked')).map(c => c.value);
@@ -477,45 +482,49 @@
                 snacks: Math.round(baseTDEE * 0.10)
             };
 
-            let fullHtml = ""; // Build string first, update DOM once
+            // Call new weekly endpoint
+            try {
+                const res = await fetch('/api/generate-week', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ allergies: algs, diseases: dis, targets: targets }) 
+                });
+                const weekPlan = await res.json();
 
-            for (let day of dNames) {
-                fullHtml += `<div class="day-section"><div class="day-title">${day}</div>`;
-                
-                for (let type of ['breakfast', 'lunch', 'dinner', 'snacks']) {
-                    try {
-                        const res = await fetch('/api/regen-meal', { 
-                            method: 'POST', 
-                            headers: {'Content-Type': 'application/json'}, 
-                            body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: targets[type] }) 
-                        });
-                        const meal = await res.json();
-                        
+                let fullHtml = "";
+                const mealTypes = ['breakfast', 'lunch', 'dinner', 'snacks'];
+
+                for (let i = 0; i < 7; i++) {
+                    fullHtml += `<div class="day-section"><div class="day-title">${dNames[i]}</div>`;
+                    
+                    mealTypes.forEach(type => {
+                        const meal = weekPlan[i][type];
                         const tKey = type==='breakfast'?'m_break':type==='lunch'?'m_lunch':type==='dinner'?'m_dinner':'m_snack';
                         const title = txt[tKey][currentLang];
                         const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
                         const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
 
-                        // Added classes 'meal-name' and 'meal-desc' for safe targeting
                         fullHtml += `<div class="meal-card">
                             <div style="font-weight:bold; color:var(--main); font-size:0.9rem;">${title}</div>
                             <div class="meal-name" style="font-weight:900;">${name}</div>
                             <div class="meal-desc" style="font-size:0.9rem; color:#666;">${desc} | ${meal.cal} cal</div>
                             <button class="regen-btn" onclick="regenOne(this, '${type}', ${targets[type]})"><i class="fas fa-sync-alt"></i></button>
                         </div>`;
-                    } catch(e) {
-                        console.error("Error fetching initial meal:", e);
-                    }
+                    });
+                    fullHtml += `</div>`;
                 }
-                fullHtml += `</div>`;
+                list.innerHTML = fullHtml;
+
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = "<div class='error-alert'>Error loading plan. Please try again.</div>";
             }
-            list.innerHTML = fullHtml; // Single update prevents flickering
         }
 
+        // Single Meal Regeneration
         async function regenOne(btn, type, target) {
-            const originalIcon = btn.innerHTML;
-            btn.innerHTML = "..."; 
-            btn.disabled = true; // Prevent double clicks
+            btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; 
+            btn.disabled = true; 
 
             try {
                 const algs = Array.from(document.querySelectorAll('.alg:checked')).map(c => c.value);
@@ -524,18 +533,14 @@
                 const res = await fetch('/api/regen-meal', { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: target || 400 }) // Fallback target
+                    body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: target }) 
                 });
-                
-                if (!res.ok) throw new Error("Network response was not ok");
                 
                 const meal = await res.json();
                 const card = btn.parentElement;
-                
                 const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
                 const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
 
-                // Targeted update using the new classes
                 const nameDiv = card.querySelector('.meal-name');
                 const descDiv = card.querySelector('.meal-desc');
 
@@ -545,9 +550,8 @@
                 btn.innerHTML = `<i class="fas fa-sync-alt"></i>`;
             } catch (err) {
                 console.error(err);
-                btn.style.backgroundColor = "#e74c3c"; // Turn red on error
+                btn.style.backgroundColor = "#e74c3c";
                 btn.innerHTML = "!";
-                alert("Error regenerating meal. Please try again.");
             } finally {
                 btn.disabled = false;
             }
