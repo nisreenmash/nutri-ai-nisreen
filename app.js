@@ -17,12 +17,10 @@ app.use(express.static(__dirname));
 
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// --- 1. MEAL DATABASE ---
-// --- 1. EXPANDED MEAL DATABASE ---
+// --- 1. FULL MEAL DATABASE (With Macros) ---
 const mealDB = {
     "middle eastern": {
         breakfast: [
-            // --- EXISTING ---
             { name_ar: "فول مدمس", desc_ar: "1 كوب فول (200غ) + 1 ملعقة زيت + كمون", name_en: "Foul Moudamas", desc_en: "1 cup fava beans + olive oil", cal: 340, macros: { p: 14, f: 14, c: 45 }, tags: ["vegan", "gluten_free"] },
             { name_ar: "ساندويش لبنة", desc_ar: "رغيف قمح صغير (50غ) + 3 ملاعق لبنة", name_en: "Labneh Sandwich", desc_en: "1 small whole wheat pita + 3 tbsp labneh", cal: 280, macros: { p: 10, f: 12, c: 35 }, tags: ["lactose", "gluten", "vegetarian"] },
             { name_ar: "بيض مسلوق", desc_ar: "2 بيضة مسلوقة + رشة دقة + خيار", name_en: "Boiled Eggs", desc_en: "2 Boiled Eggs + Dukkah spice + Cucumber", cal: 155, macros: { p: 13, f: 11, c: 1 }, tags: ["gluten_free", "vegetarian"] },
@@ -43,8 +41,6 @@ const mealDB = {
             { name_ar: "زبدة فول وتوست", desc_ar: "توست + زبدة فول سوداني", name_en: "PB Toast", desc_en: "Toast + Peanut Butter", cal: 300, macros: { p: 10, f: 16, c: 28 }, tags: ["nuts", "gluten", "vegan"] },
             { name_ar: "بانكيك صحي", desc_ar: "2 بانكيك شوفان", name_en: "Oat Pancakes", desc_en: "2 Oat pancakes", cal: 320, macros: { p: 10, f: 8, c: 50 }, tags: ["gluten", "vegetarian"] },
             { name_ar: "سموثي أخضر", desc_ar: "سبانخ + موز + حليب لوز", name_en: "Green Smoothie", desc_en: "Spinach + banana + almond milk", cal: 180, macros: { p: 3, f: 3, c: 35 }, tags: ["vegan", "gluten_free"] },
-            
-            // --- NEW ADDITIONS ---
             { name_ar: "بيض بالسجق", desc_ar: "2 بيض + 30غ سجق بلدي", name_en: "Eggs with Sujuk", desc_en: "2 Eggs + 30g Sujuk sausage", cal: 350, macros: { p: 18, f: 28, c: 2 }, tags: ["gluten_free", "high-protein"] },
             { name_ar: "حلوم وبطيخ", desc_ar: "3 شرائح حلوم + كوب بطيخ", name_en: "Halloumi & Watermelon", desc_en: "3 Slices Halloumi + 1 cup Watermelon", cal: 260, macros: { p: 15, f: 18, c: 12 }, tags: ["lactose", "gluten_free", "vegetarian"] },
             { name_ar: "دبس وطحينة", desc_ar: "2 ملعقة طحينة + 1 ملعقة دبس + خبز", name_en: "Tahini & Molasses", desc_en: "2 tbsp Tahini + 1 tbsp Molasses + Bread", cal: 380, macros: { p: 8, f: 22, c: 40 }, tags: ["vegan", "gluten"] },
@@ -55,7 +51,6 @@ const mealDB = {
             { name_ar: "عدس مدمس", desc_ar: "1 كوب عدس مطبوخ + زيت زيتون", name_en: "Lentil Foul", desc_en: "1 cup Stewed Lentils + Olive Oil", cal: 320, macros: { p: 18, f: 8, c: 45 }, tags: ["vegan", "gluten_free"] }
         ],
         lunch: [
-            // --- EXISTING ---
             { name_ar: "مجدرة", desc_ar: "6 ملاعق مجدرة (برغل أو رز) + سلطة", name_en: "Mujadara", desc_en: "6 tbsp Mujadara (Rice/Bulgur) + Salad", cal: 500, macros: { p: 18, f: 12, c: 80 }, tags: ["vegan", "gluten_free"] },
             { name_ar: "شيش طاووق", desc_ar: "2 سيخ (200غ) + نصف رغيف + ثومية", name_en: "Shish Tawook", desc_en: "2 Skewers (200g) + 1/2 Pita + Garlic dip", cal: 450, macros: { p: 45, f: 15, c: 35 }, tags: ["gluten", "high-protein"] },
             { name_ar: "منسف (لايت)", desc_ar: "150غ لحم بدون دهن + 6 ملاعق رز + جميد", name_en: "Mansaf (Lean)", desc_en: "150g Lean Meat + 6 tbsp Rice + Jameed", cal: 650, macros: { p: 40, f: 25, c: 65 }, tags: ["lactose", "gluten_free", "high-protein"] },
@@ -81,8 +76,6 @@ const mealDB = {
             { name_ar: "كبسة دجاج", desc_ar: "قطعة دجاج + 6 ملاعق رز بسمتي", name_en: "Chicken Kabsa", desc_en: "1 Chicken piece + 6 tbsp Basmati Rice", cal: 600, macros: { p: 35, f: 22, c: 68 }, tags: ["gluten_free", "high-protein"] },
             { name_ar: "كشري", desc_ar: "1 كوب كشري + صلصة طماطم", name_en: "Koshary", desc_en: "1 cup Koshary + Tomato Sauce", cal: 550, macros: { p: 15, f: 12, c: 90 }, tags: ["vegan", "gluten"] },
             { name_ar: "صينية خضار", desc_ar: "خضار مشكلة بالفرن + صدر دجاج", name_en: "Roasted Veggies", desc_en: "Oven roasted veggies + Chicken Breast", cal: 400, macros: { p: 35, f: 14, c: 25 }, tags: ["gluten_free", "high-protein"] },
-            
-            // --- NEW ADDITIONS ---
             { name_ar: "داوود باشا", desc_ar: "كرات لحم بصلصة طماطم + رز", name_en: "Dawood Basha", desc_en: "Meatballs in Tomato Sauce + Rice", cal: 550, macros: { p: 30, f: 28, c: 45 }, tags: ["gluten_free", "high-protein"] },
             { name_ar: "كوسا محشي", desc_ar: "3 حبات كوسا (لحم ورز)", name_en: "Stuffed Zucchini", desc_en: "3 Zucchinis (Meat & Rice)", cal: 450, macros: { p: 20, f: 18, c: 55 }, tags: ["gluten_free"] },
             { name_ar: "فريكة دجاج", desc_ar: "1 كوب فريكة + صدر دجاج", name_en: "Freekeh Chicken", desc_en: "1 cup Freekeh + Chicken Breast", cal: 500, macros: { p: 40, f: 12, c: 55 }, tags: ["gluten", "high-protein"] },
@@ -93,7 +86,6 @@ const mealDB = {
             { name_ar: "شيش برك", desc_ar: "10 حبات شيش برك + لبن", name_en: "Shish Barak", desc_en: "10 Meat Dumplings in Yogurt", cal: 600, macros: { p: 25, f: 28, c: 55 }, tags: ["gluten", "lactose"] }
         ],
         dinner: [
-            // --- EXISTING ---
             { name_ar: "شوربة عدس", desc_ar: "1.5 كوب (350مل) + ليمون", name_en: "Lentil Soup", desc_en: "1.5 cups (350ml) + Lemon", cal: 290, macros: { p: 15, f: 6, c: 45 }, tags: ["vegan", "gluten_free"] },
             { name_ar: "سلطة حلوم", desc_ar: "3 شرائح حلوم + 2 كوب خضار", name_en: "Halloumi Salad", desc_en: "3 slices Halloumi + 2 cups Veggies", cal: 320, macros: { p: 18, f: 24, c: 10 }, tags: ["lactose", "gluten_free", "vegetarian"] },
             { name_ar: "تونا بالماء", desc_ar: "علبة صغيرة (ماء) + نصف كوب ذرة", name_en: "Tuna Salad", desc_en: "1 small Tuna can (water) + 1/2 cup Corn", cal: 250, macros: { p: 30, f: 2, c: 25 }, tags: ["gluten_free", "high-protein", "pescatarian"] },
@@ -114,8 +106,6 @@ const mealDB = {
             { name_ar: "شوربة شوفان", desc_ar: "1 كوب شوربة شوفان ودجاج", name_en: "Oat & Chicken Soup", desc_en: "1 cup Oat & Chicken Soup", cal: 250, macros: { p: 15, f: 6, c: 35 }, tags: ["gluten", "high-protein"] },
             { name_ar: "بطاطا مشوية", desc_ar: "حبة متوسطة + ملعقة لبنة", name_en: "Baked Potato", desc_en: "Medium Potato + 1 tbsp Labneh", cal: 200, macros: { p: 6, f: 2, c: 45 }, tags: ["lactose", "gluten_free", "vegetarian"] },
             { name_ar: "سلطة تونا", desc_ar: "نصف علبة تونا + فاصوليا حمراء", name_en: "Tuna Bean Salad", desc_en: "1/2 Tuna Can + Red Kidney Beans", cal: 250, macros: { p: 25, f: 4, c: 28 }, tags: ["gluten_free", "high-protein"] },
-            
-            // --- NEW ADDITIONS ---
             { name_ar: "سلطة شمندر", desc_ar: "شمندر مسلوق + جرجير + جوز", name_en: "Beetroot Salad", desc_en: "Boiled Beetroot + Roca + Walnuts", cal: 220, macros: { p: 5, f: 12, c: 25 }, tags: ["vegan", "gluten_free"] },
             { name_ar: "شوربة قرع", desc_ar: "كوب شوربة قرع (بدون كريمة)", name_en: "Pumpkin Soup", desc_en: "1 cup Pumpkin Soup (No Cream)", cal: 180, macros: { p: 4, f: 6, c: 30 }, tags: ["vegan", "gluten_free"] },
             { name_ar: "بطاطا حرة", desc_ar: "مكعبات بطاطا بالثوم والكزبرة (فرن)", name_en: "Batata Harra", desc_en: "Spicy Potatoes with Cilantro (Baked)", cal: 250, macros: { p: 4, f: 8, c: 40 }, tags: ["vegan", "gluten_free"] },
@@ -126,7 +116,6 @@ const mealDB = {
             { name_ar: "سلطة عدس", desc_ar: "عدس + طماطم + بقدونس", name_en: "Lentil Salad", desc_en: "Lentils + Tomato + Parsley", cal: 220, macros: { p: 14, f: 6, c: 35 }, tags: ["vegan", "gluten_free"] }
         ],
         snacks: [
-            // --- EXISTING ---
             { name_ar: "تمر وجوز", desc_ar: "3 حبات تمر + 3 أنصاف جوز", name_en: "Dates & Walnuts", desc_en: "3 Dates + 3 Walnut halves", cal: 190, macros: { p: 3, f: 10, c: 25 }, tags: ["nuts", "vegan", "sugar", "gluten_free"] },
             { name_ar: "فواكه", desc_ar: "تفاحة متوسطة أو كوب فراولة", name_en: "Fruit", desc_en: "Medium Apple or 1 cup Strawberry", cal: 100, macros: { p: 1, f: 0, c: 25 }, tags: ["vegan", "sugar", "gluten_free"] },
             { name_ar: "حمص محمص", desc_ar: "نصف كوب حمص بالفرن", name_en: "Roasted Chickpeas", desc_en: "1/2 cup Oven Roasted Chickpeas", cal: 150, macros: { p: 7, f: 4, c: 22 }, tags: ["vegan", "gluten_free"] },
@@ -147,8 +136,6 @@ const mealDB = {
             { name_ar: "سحلب", desc_ar: "نصف كوب (حليب خالي الدسم)", name_en: "Sahlab", desc_en: "1/2 cup (Skim Milk)", cal: 150, macros: { p: 6, f: 3, c: 25 }, tags: ["lactose", "sugar"] },
             { name_ar: "مهلبيبة", desc_ar: "نصف كوب (سكر خفيف)", name_en: "Muhallabia", desc_en: "1/2 cup (Light Sugar)", cal: 180, macros: { p: 5, f: 6, c: 28 }, tags: ["lactose", "sugar", "gluten_free"] },
             { name_ar: "بوظة عربية", desc_ar: "كرة واحدة (بدون فستق)", name_en: "Arabic Ice Cream", desc_en: "1 scoop (No Pistachios)", cal: 200, macros: { p: 4, f: 10, c: 22 }, tags: ["lactose", "sugar", "gluten_free"] },
-            
-            // --- NEW ADDITIONS ---
             { name_ar: "تين مجفف", desc_ar: "2 حبة تين مجفف", name_en: "Dried Figs", desc_en: "2 Dried Figs", cal: 100, macros: { p: 1, f: 0, c: 26 }, tags: ["vegan", "sugar", "gluten_free"] },
             { name_ar: "بزر دوار الشمس", desc_ar: "2 ملعقة طعام (بدون ملح)", name_en: "Sunflower Seeds", desc_en: "2 tbsp (Unsalted)", cal: 160, macros: { p: 6, f: 14, c: 4 }, tags: ["vegan", "gluten_free", "nuts"] },
             { name_ar: "رمان", desc_ar: "كوب حب رمان", name_en: "Pomegranate Seeds", desc_en: "1 cup Pomegranate", cal: 140, macros: { p: 2, f: 2, c: 32 }, tags: ["vegan", "sugar", "gluten_free"] },
@@ -160,6 +147,7 @@ const mealDB = {
         ]
     }
 };
+
 // --- 2. CHATBOT ---
 app.post("/api/chat", async (req, res) => {
     try {
@@ -186,7 +174,7 @@ app.post("/api/chat", async (req, res) => {
 
 // --- 3. HEALTH CALCULATIONS ---
 app.post("/api/calculate", (req, res) => {
-    const { weight, height, age, gender, bf, activity, diseases, injuries } = req.body;
+    let { weight, height, age, gender, bf, activity, goal, diseases, injuries } = req.body;
     
     const w = parseFloat(weight);
     const h = parseFloat(height);
@@ -214,9 +202,20 @@ app.post("/api/calculate", (req, res) => {
     if (w < 40) return res.json({ stop: true, message: "Weight is quite low (<40kg)." });
     if (w > 130) return res.json({ stop: true, message: "Based on your weight (>130kg), we highly recommend consulting a healthcare professional." });
 
-    // --- CALCULATION LOGIC (Ideal Weight Focus) ---
+    // --- BMI & RESTRICTIONS (STRICT CHECK) ---
+    const heightM = h / 100;
+    const bmi = (w / (heightM * heightM)).toFixed(1);
     
-    // 1. Calculate BMR
+    let warning_msg = null;
+    let alerts = [];
+
+    // STRICT RULE: If BMI is Normal (18.5 - 24.9) AND Goal is Cut -> Force Maintenance
+    if (bmi >= 18.5 && bmi < 25 && goal === 'cut') {
+        goal = 'maintain'; // OVERRIDE GOAL
+        alerts.push("Goal adjusted to Maintenance (Your weight is already healthy)");
+    }
+
+    // --- CALCULATION LOGIC ---
     let bmr;
     if (bf && bf > 0) {
         bmr = 370 + (21.6 * (w * (1 - (bf / 100)))); 
@@ -227,30 +226,13 @@ app.post("/api/calculate", (req, res) => {
     }
     if (hasPCOS) bmr *= 0.95;
 
-    // 2. TDEE
     let tdee = bmr * parseFloat(activity);
 
-    // 3. Ideal Weight Logic (Override user Goal)
-    const heightM = h / 100;
-    const bmi = (w / (heightM * heightM)).toFixed(1);
-    const perfectW = (22 * (heightM * heightM)).toFixed(1); // Target BMI 22
-    const diff = (w - perfectW);
+    // Apply Goal (using the potentially overridden 'goal')
+    if (goal === 'cut') tdee -= 500;
+    if (goal === 'bulk') tdee += 400;
 
-    let finalGoal = "maintenance"; // internal tracking
-
-    // Allow small buffer (± 2kg) for "Normal"
-    if (diff > 2) {
-        // Needs to lose weight
-        tdee -= 500;
-        finalGoal = "cut";
-    } else if (diff < -2) {
-        // Needs to gain weight
-        tdee += 400; // Safe surplus
-        finalGoal = "bulk";
-    } 
-    // else: Maintenance (keep TDEE as is)
-
-    // 4. Safety Floors
+    // Safety Floors
     if (gender !== 'male' && tdee < 1200) tdee = 1200;
     if (gender === 'male' && tdee < 1500) tdee = 1500;
 
@@ -260,18 +242,20 @@ app.post("/api/calculate", (req, res) => {
     else if (bmi >= 25 && bmi < 30) { status_en = "Overweight"; status_ar = "زيادة وزن"; }
     else if (bmi >= 30) { status_en = "Obese"; status_ar = "سمنة"; }
 
+    const perfectW = (22 * (heightM * heightM)).toFixed(1);
+    const diff = (w - perfectW).toFixed(1);
+
     const macros = {
         p: Math.round(w * 2.0),
         f: Math.round((tdee * 0.25) / 9),
         c: Math.round((tdee - (w * 2.0 * 4) - (tdee * 0.25)) / 4)
     };
 
-    let warning_msg = null;
-    let alerts = [];
     if (hasDisease) alerts.push("Chronic Condition (Consult Physician)");
     if (hasInjury) alerts.push("Workout Injury (Consult Coach/PT)");
+
     if (alerts.length > 0) {
-        warning_msg = "⚠️ Medical Notice: " + alerts.join(" & ") + ". We have adjusted your plan for safety, but please consult a professional before starting.";
+        warning_msg = "⚠️ Notice: " + alerts.join(" & ") + ".";
     }
 
     res.json({ 
@@ -282,13 +266,13 @@ app.post("/api/calculate", (req, res) => {
         status_en,
         status_ar,
         perfectW,
-        diff: diff.toFixed(1),
+        diff,
         warning_msg,
-        auto_goal: finalGoal
+        final_goal: goal // Send back the actual goal used
     });
 });
 
-// --- HELPER FOR VARIETY & SCALING ---
+// --- HELPER ---
 function getMeals(category, count, allergies, diseases, targetCal) {
     const algs = Array.isArray(allergies) ? allergies : [];
     const dis = Array.isArray(diseases) ? diseases : [];
@@ -304,52 +288,55 @@ function getMeals(category, count, allergies, diseases, targetCal) {
 
     if(validMeals.length === 0) return []; 
 
-    // Find closest matches first to start with good base
     if(targetCal) {
         validMeals.sort((a, b) => Math.abs(a.cal - targetCal) - Math.abs(b.cal - targetCal));
-        const topSlice = Math.max(1, Math.floor(validMeals.length * 0.7)); // Keep top 70% for variety
+        const topSlice = Math.max(1, Math.floor(validMeals.length * 0.7)); 
         validMeals = validMeals.slice(0, topSlice);
     }
 
-    // Shuffle
     for (let i = validMeals.length - 1; i > 0; i--) {
         const j = Math.floor(Math.random() * (i + 1));
         [validMeals[i], validMeals[j]] = [validMeals[j], validMeals[i]];
     }
 
-    // Select & Scale
     let selected = [];
     for(let i=0; i<count; i++) {
         let originalMeal = validMeals[i % validMeals.length];
+        let finalMeal = { ...originalMeal }; 
         
-        // --- PORTION SCALING LOGIC ---
-        let finalMeal = { ...originalMeal }; // clone
-        
+        // Ensure macros exist (fallback for old data)
+        if (!finalMeal.macros) finalMeal.macros = { p: 0, f: 0, c: 0 };
+
         if (targetCal) {
             let ratio = targetCal / originalMeal.cal;
-            finalMeal.cal = targetCal; // Force exact calorie match
+            finalMeal.cal = targetCal; 
             
-            // Append instruction based on ratio
+            // Scale Macros
+            finalMeal.macros = {
+                p: Math.round(originalMeal.macros.p * ratio),
+                f: Math.round(originalMeal.macros.f * ratio),
+                c: Math.round(originalMeal.macros.c * ratio)
+            };
+
             let ratioStr = ratio.toFixed(1);
             if (ratio > 1.1) {
-                finalMeal.name_en += ` (x${ratioStr} Portion)`;
-                finalMeal.name_ar += ` (حصة x${ratioStr})`;
-                finalMeal.desc_en += ` [Increase portion by x${ratioStr}]`;
-                finalMeal.desc_ar += ` [ضاعف الكمية x${ratioStr}]`;
+                finalMeal.name_en += ` (x${ratioStr})`;
+                finalMeal.name_ar += ` (x${ratioStr})`;
+                finalMeal.desc_en += ` [Increase x${ratioStr}]`;
+                finalMeal.desc_ar += ` [ضاعف x${ratioStr}]`;
             } else if (ratio < 0.9) {
-                finalMeal.name_en += ` (x${ratioStr} Portion)`;
-                finalMeal.name_ar += ` (حصة x${ratioStr})`;
-                finalMeal.desc_en += ` [Reduce portion to x${ratioStr}]`;
-                finalMeal.desc_ar += ` [قلل الكمية لـ x${ratioStr}]`;
+                finalMeal.name_en += ` (x${ratioStr})`;
+                finalMeal.name_ar += ` (x${ratioStr})`;
+                finalMeal.desc_en += ` [Reduce x${ratioStr}]`;
+                finalMeal.desc_ar += ` [قلل x${ratioStr}]`;
             }
         }
-        
         selected.push(finalMeal);
     }
     return selected;
 }
 
-// --- 4. GENERATE WEEKLY PLAN ---
+// --- 4. WEEK GENERATOR ---
 app.post("/api/generate-week", (req, res) => {
     const { allergies, diseases, targets } = req.body;
     
@@ -361,20 +348,18 @@ app.post("/api/generate-week", (req, res) => {
     let weekPlan = {};
     for(let i=0; i<7; i++) {
         weekPlan[i] = {
-            breakfast: breakfasts[i] || { name_en: "Oatmeal", name_ar: "شوفان", cal: targets.breakfast, desc_en: "Adjust portion to fit", desc_ar: "عدل الكمية لتناسب" },
-            lunch: lunches[i] || { name_en: "Chicken & Rice", name_ar: "دجاج ورز", cal: targets.lunch, desc_en: "Adjust portion to fit", desc_ar: "عدل الكمية لتناسب" },
-            dinner: dinners[i] || { name_en: "Salad", name_ar: "سلطة", cal: targets.dinner, desc_en: "Adjust portion to fit", desc_ar: "عدل الكمية لتناسب" },
-            snacks: snacks[i] || { name_en: "Fruit", name_ar: "فاكهة", cal: targets.snacks, desc_en: "Adjust portion to fit", desc_ar: "عدل الكمية لتناسب" }
+            breakfast: breakfasts[i],
+            lunch: lunches[i],
+            dinner: dinners[i],
+            snacks: snacks[i]
         };
     }
-
     res.json(weekPlan);
 });
 
-// --- 5. REGENERATE SINGLE MEAL ---
+// --- 5. REGENERATE SINGLE ---
 app.post("/api/regen-meal", (req, res) => {
     const { type, allergies, diseases, targetCalories } = req.body; 
-    // Get 1 selection with scaling
     const selection = getMeals(type === 'snacks' ? 'snacks' : type, 1, allergies, diseases, targetCalories);
     res.json(selection[0]);
 });
