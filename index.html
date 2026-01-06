@@ -8,71 +8,51 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     
     <style>
+        /* (Copy previous CSS here) */
         :root { --bg: #f0f2f5; --card: #fff; --main: #27ae60; --dark: #2c3e50; }
         body { font-family: 'Cairo', sans-serif; background: var(--bg); color: var(--dark); margin: 0; padding-bottom: 90px; transition: 0.3s; }
         html[lang="en"] body { font-family: 'Segoe UI', sans-serif; }
-
         .header { background: var(--dark); padding: 15px 20px; color: white; display: flex; justify-content: space-between; align-items: center; }
         .lang-btn { background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.5); padding: 5px 15px; border-radius: 20px; cursor: pointer; font-size: 0.9rem; transition: 0.3s; }
         .lang-btn:hover { background: var(--main); border-color: var(--main); }
-
         .container { padding: 20px; max-width: 600px; margin: 0 auto; display: none; }
         .active-page { display: block; animation: fadeIn 0.4s ease-out; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
         .card { background: var(--card); border-radius: 20px; padding: 20px; margin-bottom: 15px; box-shadow: 0 4px 15px rgba(0,0,0,0.04); }
         .section-head { font-weight: 800; color: var(--olive-dark); margin-bottom: 15px; font-size: 1.1rem; display: flex; align-items: center; gap: 8px; }
-        
         input, select { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #ddd; background: #fff; font-family: inherit; font-size: 1rem; margin-bottom: 10px; box-sizing: border-box; }
         .btn-main { width: 100%; background: var(--main); color: white; padding: 16px; border-radius: 14px; border: none; font-weight: 700; cursor: pointer; margin-top: 15px; transition: 0.2s; }
         .btn-main:active { transform: scale(0.98); }
-
-        /* ID Card */
         .id-card { background: linear-gradient(135deg, #2c3e50, #4ca1af); color: white; border-radius: 15px; padding: 20px; margin-bottom: 15px; }
         .id-row { display: flex; justify-content: space-between; margin-bottom: 8px; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 5px; }
         .id-val { font-weight: bold; }
-
-        /* Meal Cards */
         .day-section { margin-top: 30px; border-top: 2px dashed #eee; padding-top: 20px; }
         .day-title { text-align: center; font-weight: 900; background: #e8f5e9; padding: 8px; border-radius: 8px; color: var(--dark); margin-bottom: 10px; }
         .meal-card { border-inline-start: 5px solid var(--main); padding: 15px; background: white; margin-bottom: 10px; position: relative; border-radius: 8px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
         .regen-btn { position: absolute; inset-inline-end: 10px; top: 15px; background: #f0f0f0; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; color: #555; transition: 0.3s; }
         .regen-btn:hover { background: #e0e0e0; }
-
         .check-group { display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 15px; border: 1px solid #eee; padding: 10px; border-radius: 10px; }
         .check-label { font-size: 0.9rem; cursor: pointer; display: flex; align-items: center; gap: 5px; }
-
         .wo-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
         .wo-table th { background: var(--dark); color: white; padding: 10px; border-radius: 8px 8px 0 0; }
         .wo-table td { border-bottom: 1px solid #eee; padding: 10px; vertical-align: top; }
         .wo-row:nth-child(even) { background: #f9f9f9; }
-
         .info-alert { background: #e3f2fd; border: 1px solid #2196f3; color: #0d47a1; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-size: 0.9rem; }
         .error-alert { background: #ffebee; border: 1px solid #e57373; color: #c62828; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; }
         .warning-alert { background: #fff3e0; border: 1px solid #ffb74d; color: #e65100; padding: 15px; border-radius: 10px; margin-bottom: 20px; font-weight: bold; font-size: 0.9rem; display: none; }
-
         #chat-box { height: 50vh; overflow-y: auto; background: #f4f6f8; padding: 15px; border-radius: 20px; border: 1px solid #eee; margin-bottom: 10px; }
         .msg { padding: 10px 15px; border-radius: 15px; margin-bottom: 10px; max-width: 85%; }
         .ai { background: white; border: 1px solid #ddd; border-radius: 18px 18px 18px 0; }
         .user { background: var(--main); color: white; margin-inline-start: auto; border-radius: 18px 18px 0 18px; }
         .typing { font-size: 0.8rem; color: #888; font-style: italic; display: none; margin: 0 15px; }
-
         .nav-bar { position: fixed; bottom: 0; width: 100%; background: white; border-top: 1px solid #eee; display: flex; justify-content: space-around; padding: 15px 0; z-index: 999; }
         .nav-item { font-size: 1.5rem; color: #ccc; cursor: pointer; }
         .active-nav { color: var(--main); transform: translateY(-5px); }
-
         .fa-spin { animation: fa-spin 1s infinite linear; }
         @keyframes fa-spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-
-        @media print {
-            .nav-bar, .header, #pg-setup, #pg-chat, #pg-gym, .regen-btn, .btn-main { display: none !important; }
-            .container { display: block !important; }
-            body { background: white; padding: 0; }
-            .card { box-shadow: none; border: 1px solid #ddd; }
-            .id-card { background: white; color: black; border: 2px solid #000; }
-            .id-row { border-color: #ccc; }
-            #pg-food { margin: 0; max-width: 100%; }
-        }
+        @media print { .nav-bar, .header, #pg-setup, #pg-chat, #pg-gym, .regen-btn, .btn-main { display: none !important; } .container { display: block !important; } body { background: white; padding: 0; } .card { box-shadow: none; border: 1px solid #ddd; } .id-card { background: white; color: black; border: 2px solid #000; } .id-row { border-color: #ccc; } #pg-food { margin: 0; max-width: 100%; } }
+        /* NEW: Macro Style */
+        .macro-tag { font-size: 0.75rem; background: #eee; padding: 2px 6px; border-radius: 4px; margin-inline-end: 5px; color: #555; }
     </style>
 </head>
 <body>
@@ -85,9 +65,7 @@
     <div id="pg-setup" class="container active-page">
         <div class="card">
             <div class="section-head"><i class="fas fa-id-card"></i> <span data-t="profile_title">الملف الشخصي</span></div>
-            
             <div id="setup-error" style="display:none;" class="error-alert"></div>
-
             <input type="text" id="u-name" placeholder="الاسم الكامل">
             <div style="display:flex; gap:10px;">
                 <input type="number" id="u-w" placeholder="الوزن (kg)">
@@ -98,10 +76,8 @@
                 <option value="male" data-t="male">ذكر</option>
                 <option value="female" data-t="female">أنثى</option>
             </select>
-            
             <label style="color:var(--main); font-weight:bold;" data-t="inbody_label">نسبة الدهون (من InBody - اختياري)</label>
             <input type="number" id="u-bf" placeholder="e.g. 20">
-            
             <label data-t="days_label">أيام التمرين</label>
             <select id="u-days">
                 <option value="0" data-t="day_0">0 أيام (بدون تمرين)</option>
@@ -110,28 +86,24 @@
                 <option value="5" data-t="day_5">5 أيام (دفع/سحب/أرجل)</option>
                 <option value="6" data-t="day_6">6 أيام (دفع/سحب/أرجل x2)</option>
             </select>
-
             <label data-t="injury_label" style="font-weight:bold; color:#c0392b;">إصابات الملاعب</label>
             <div class="check-group">
                 <label class="check-label"><input type="checkbox" class="inj" value="shoulder"> <span data-t="inj_sh">كتف</span></label>
                 <label class="check-label"><input type="checkbox" class="inj" value="knee"> <span data-t="inj_kn">ركبة</span></label>
                 <label class="check-label"><input type="checkbox" class="inj" value="back"> <span data-t="inj_bk">ظهر</span></label>
             </div>
-
             <label data-t="med_label" style="font-weight:bold; color:var(--dark);">الأمراض المزمنة</label>
             <div class="check-group">
                 <label class="check-label"><input type="checkbox" class="med" value="diabetes"> <span data-t="med_diab">سكري</span></label>
                 <label class="check-label"><input type="checkbox" class="med" value="pressure"> <span data-t="med_bp">ضغط</span></label>
                 <label class="check-label"><input type="checkbox" class="med" value="pcos"> <span data-t="med_pcos">تكيس</span></label>
             </div>
-
             <label data-t="alg_label" style="font-weight:bold; color:var(--dark);">الحساسيات الغذائية</label>
             <div class="check-group">
                 <label class="check-label"><input type="checkbox" class="alg" value="gluten"> <span data-t="alg_gluten">غلوتين</span></label>
                 <label class="check-label"><input type="checkbox" class="alg" value="lactose"> <span data-t="alg_lactose">لاكتوز</span></label>
                 <label class="check-label"><input type="checkbox" class="alg" value="nuts"> <span data-t="alg_nuts">مكسرات</span></label>
             </div>
-
             <label data-t="activity_label">مستوى النشاط</label>
             <select id="u-activity">
                 <option value="1.2" data-t="act_1">خامل</option>
@@ -140,22 +112,18 @@
                 <option value="1.725" data-t="act_4">عالي</option>
                 <option value="1.9" data-t="act_5">نشيط جداً (Extra)</option>
             </select>
-
             <label data-t="goal_label">الهدف</label>
             <select id="u-goal">
                 <option value="cut" data-t="goal_cut">خسارة دهون</option>
                 <option value="maintain" data-t="goal_maint">محافظة</option>
                 <option value="bulk" data-t="goal_bulk">بناء عضل</option>
             </select>
-
             <button class="btn-main" onclick="generatePlan()" data-t="btn_gen">إنشاء الخطة</button>
         </div>
     </div>
 
     <div id="pg-food" class="container">
-        
         <div id="medical-warning" class="warning-alert"></div>
-
         <div class="id-card">
             <div style="text-align:center; font-weight:bold; font-size:1.2rem; margin-bottom:10px;" data-t="id_title">🆔 البطاقة الصحية</div>
             <div class="id-row"><span data-t="id_name">الاسم:</span> <span class="id-val" id="id-name">User</span></div>
@@ -169,16 +137,13 @@
                 <span data-t="id_needs">الاحتياج:</span> <span id="id-cals" style="color:#f1c40f; margin-inline-start:5px;">0</span>
             </div>
         </div>
-
         <div class="info-alert" data-t="hydration_note">
             💧 تذكير: اشرب 3-4 لتر ماء يومياً. إذا كنت تشرب القهوة، قللها لـ 200 ملغ (كوبين) لتجنب الجفاف.
         </div>
-
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <h3 class="section-head" style="margin:0;" data-t="week_title">الجدول الأسبوعي</h3>
             <button class="btn-main" style="width:auto; padding:8px 15px; font-size:0.9rem;" onclick="window.print()" data-t="btn_print">🖨️ طباعة</button>
         </div>
-        
         <div id="meals-list"></div>
     </div>
 
@@ -191,12 +156,10 @@
                 <button class="btn-main" onclick="adjustCalories()" style="margin:0; width:auto;" data-t="btn_adjust">تعديل</button>
             </div>
         </div>
-
         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
             <div class="section-head" style="margin:0;"><i class="fas fa-dumbbell"></i> <span data-t="workout_title">جدول التمرين</span></div>
             <button class="btn-main" style="width:auto; padding:5px 15px; font-size:0.8rem; margin:0;" onclick="window.print()" data-t="btn_print">🖨️</button>
         </div>
-
         <div class="card">
             <div id="workout-info" style="margin-bottom:15px; font-weight:bold; color:#555;"></div>
             <table class="wo-table">
@@ -204,7 +167,6 @@
                 <tbody id="wo-body"></tbody>
             </table>
         </div>
-        
         <div class="card">
             <h3 data-t="update_title">تحديث الوزن</h3>
             <input type="number" id="new-weight" placeholder="kg">
@@ -232,11 +194,13 @@
     </nav>
 
     <script>
+        // ... (Variable Declarations remain the same) ...
         let currentLang = 'ar';
         let currentStatusAr = "--";
         let currentStatusEn = "--";
         let baseTDEE = 0;
 
+        // ... (Keep 'const txt' object) ...
         const txt = {
             profile_title: { ar: "الملف الشخصي", en: "Personal Profile" },
             male: { ar: "ذكر", en: "Male" },
@@ -329,11 +293,7 @@
             }
 
             if(document.getElementById('meals-list').innerHTML !== "") {
-                // Re-render only if plan exists
-                // Note: We avoid full re-render here to keep state, 
-                // but for language toggle it's necessary.
-                render7DayPlan();
-                renderDynamicWorkout();
+                generatePlan(); 
             }
         }
 
@@ -406,7 +366,7 @@
                 document.getElementById('id-ideal').innerText = data.perfectW + " kg";
                 document.getElementById('id-diff').innerText = data.diff + " kg";
 
-                await render7DayPlan(); // Await ensures full render
+                await render7DayPlan(); 
                 renderDynamicWorkout();
                 nav('pg-food', document.querySelectorAll('.nav-item')[1]);
             } catch(e) {
@@ -465,7 +425,6 @@
             schedule.forEach(s => tbody.innerHTML += `<tr class="wo-row"><td>${s.d}</td><td style="color:var(--main); font-weight:bold;">${s.f}</td><td style="font-size:0.85rem;">${s.ex}</td></tr>`);
         }
 
-        // --- UPDATED: REGENERATE LOGIC ---
         async function render7DayPlan() {
             const list = document.getElementById('meals-list');
             list.innerHTML = "<div style='text-align:center; padding:20px;'><i class='fas fa-spinner fa-spin'></i> جارٍ إعداد الخطة...</div>";
@@ -481,43 +440,55 @@
                 snacks: Math.round(baseTDEE * 0.10)
             };
 
-            let fullHtml = ""; // Build string first, update DOM once
+            try {
+                const res = await fetch('/api/generate-week', { 
+                    method: 'POST', 
+                    headers: {'Content-Type': 'application/json'}, 
+                    body: JSON.stringify({ allergies: algs, diseases: dis, targets: targets }) 
+                });
+                const weekPlan = await res.json();
 
-            for (let day of dNames) {
-                fullHtml += `<div class="day-section"><div class="day-title">${day}</div>`;
-                
-                for (let type of ['breakfast', 'lunch', 'dinner', 'snacks']) {
-                    try {
-                        const res = await fetch('/api/regen-meal', { 
-                            method: 'POST', 
-                            headers: {'Content-Type': 'application/json'}, 
-                            body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: targets[type] }) 
-                        });
-                        const meal = await res.json();
-                        
+                let fullHtml = "";
+                const mealTypes = ['breakfast', 'lunch', 'dinner', 'snacks'];
+
+                for (let i = 0; i < 7; i++) {
+                    fullHtml += `<div class="day-section"><div class="day-title">${dNames[i]}</div>`;
+                    
+                    mealTypes.forEach(type => {
+                        const meal = weekPlan[i][type];
                         const tKey = type==='breakfast'?'m_break':type==='lunch'?'m_lunch':type==='dinner'?'m_dinner':'m_snack';
                         const title = txt[tKey][currentLang];
                         const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
                         const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
+                        
+                        // NEW: Macros Display logic
+                        const macros = meal.macros || { p: 0, f: 0, c: 0 };
+                        const macroHtml = `
+                            <div style="margin-top:5px;">
+                                <span class="macro-tag">P: ${macros.p}g</span>
+                                <span class="macro-tag">F: ${macros.f}g</span>
+                                <span class="macro-tag">C: ${macros.c}g</span>
+                            </div>`;
 
-                        // Added classes 'meal-name' and 'meal-desc' for safe targeting
                         fullHtml += `<div class="meal-card">
                             <div style="font-weight:bold; color:var(--main); font-size:0.9rem;">${title}</div>
                             <div class="meal-name" style="font-weight:900;">${name}</div>
                             <div class="meal-desc" style="font-size:0.9rem; color:#666;">${desc} | ${meal.cal} cal</div>
+                            ${macroHtml}
                             <button class="regen-btn" onclick="regenOne(this, '${type}', ${targets[type]})"><i class="fas fa-sync-alt"></i></button>
                         </div>`;
-                    } catch(e) {
-                        console.error("Error fetching initial meal:", e);
-                    }
+                    });
+                    fullHtml += `</div>`;
                 }
-                fullHtml += `</div>`;
+                list.innerHTML = fullHtml;
+
+            } catch (e) {
+                console.error(e);
+                list.innerHTML = "<div class='error-alert'>Error loading plan. Please try again.</div>";
             }
-            list.innerHTML = fullHtml; // Single update prevents flickering
         }
 
         async function regenOne(btn, type, target) {
-            const originalIcon = btn.innerHTML;
             btn.innerHTML = `<i class="fas fa-spinner fa-spin"></i>`; 
             btn.disabled = true; 
 
@@ -528,10 +499,8 @@
                 const res = await fetch('/api/regen-meal', { 
                     method: 'POST', 
                     headers: {'Content-Type': 'application/json'}, 
-                    body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: target || 400 }) // Fallback target
+                    body: JSON.stringify({ type, allergies: algs, diseases: dis, targetCalories: target }) 
                 });
-                
-                if (!res.ok) throw new Error("Network response was not ok");
                 
                 const meal = await res.json();
                 const card = btn.parentElement;
@@ -539,9 +508,25 @@
                 const name = currentLang==='ar' ? meal.name_ar : meal.name_en;
                 const desc = currentLang==='ar' ? meal.desc_ar : meal.desc_en;
 
-                // Targeted update using the new classes
                 const nameDiv = card.querySelector('.meal-name');
                 const descDiv = card.querySelector('.meal-desc');
+                
+                // NEW: Update Macros on regenerate
+                // This assumes the macro div is the 4th child (index 3). 
+                // A safer way is re-rendering the whole card innerHTML or adding a class to the macro div.
+                // Let's re-render the card innerHTML parts carefully or target by class if added.
+                // Since I added the class 'macro-tag' to spans inside a div, let's find that div.
+                // Simpler approach: Just rebuild the card content around the button.
+                
+                const macros = meal.macros || { p: 0, f: 0, c: 0 };
+                const macroHtml = `
+                    <span class="macro-tag">P: ${macros.p}g</span>
+                    <span class="macro-tag">F: ${macros.f}g</span>
+                    <span class="macro-tag">C: ${macros.c}g</span>`;
+                
+                // Find the div containing macros (it's the one after desc)
+                const macroDiv = card.querySelector('div[style*="margin-top:5px"]');
+                if(macroDiv) macroDiv.innerHTML = macroHtml;
 
                 if (nameDiv) nameDiv.innerText = name;
                 if (descDiv) descDiv.innerText = `${desc} | ${meal.cal} cal`;
@@ -549,9 +534,8 @@
                 btn.innerHTML = `<i class="fas fa-sync-alt"></i>`;
             } catch (err) {
                 console.error(err);
-                btn.style.backgroundColor = "#e74c3c"; // Turn red on error
+                btn.style.backgroundColor = "#e74c3c";
                 btn.innerHTML = "!";
-                alert("Error regenerating meal. Please try again.");
             } finally {
                 btn.disabled = false;
             }
